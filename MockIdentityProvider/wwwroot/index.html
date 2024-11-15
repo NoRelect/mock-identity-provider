@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="color-scheme" content="light dark">
+        <link rel="stylesheet" href="css/pico.min.css">
+        <title>MIdP | Home</title>
+    </head>
+    <body>
+        <main class="container">
+            <nav>
+                <ul>
+                    <li><strong>Mock IdP</strong></li>
+                </ul>
+            </nav>
+            <a role="button" tabindex="0" href="/.well-known/openid-configuration">OpenID Configuration</a>
+            <a role="button" tabindex="1" id="auth">Trigger demo authentication</a>
+        </main>
+        <script>
+            let base_url = window.location.protocol + "//" + window.location.host;
+            const paramsObj = {
+                "client_id": "test",
+                "scope": "openid profile email role",
+                "response_type": "id_token token",
+                "redirect_uri": base_url+"/inspect.html",
+                "nonce": "hardcoded"
+            };
+            const searchParams = new URLSearchParams(paramsObj);
+            document.getElementById("auth").href = "/authorize?" + searchParams.toString();
+        </script>
+    </body>
+</html>
