@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="color-scheme" content="light dark">
+        <link rel="stylesheet" href="css/pico.min.css">
+        <title>MIdP | Inspect</title>
+    </head>
+    <body>
+        <main class="container">
+            <nav>
+                <ul>
+                    <li><strong>Mock IdP - User Info</strong></li>
+                </ul>
+            </nav>
+            <pre id="result" style="padding: 15px">Fetching user info...</pre>
+        </main>
+        <script>
+            async function user_info() {
+                var access_token = new URLSearchParams(window.location.hash.slice(1)).get('access_token');
+                let r = await fetch("/user-info", {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': "Bearer " + access_token,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                let t = await r.text();
+                if (r.ok) {
+                    document.getElementById("result").innerText = t;
+                } else {
+                    document.getElementById("result").innerText = "An error occurred";
+                }
+            }
+            user_info();
+        </script>
+    </body>
+</html>
