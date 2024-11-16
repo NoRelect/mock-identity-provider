@@ -3,11 +3,14 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore;
 using Microsoft.IdentityModel.Tokens;
+using MockIdentityProvider.Models;
 using OpenIddict.Abstractions;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Server.OpenIddictServerEvents;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var mockUsers = builder.Configuration.GetSection("Users").Get<List<MockUser>>() ?? [];
 
 builder.Services.AddOpenIddict()
     .AddServer(options =>
@@ -68,8 +71,6 @@ builder.Services.AddOpenIddict()
                 {
                     context.HandleRequest();
 
-                    List<string> users = ["admin", "author", "player"];
-
                     var responseHtml = """
                     <!doctype html>
                     <html lang="en">
@@ -92,7 +93,7 @@ builder.Services.AddOpenIddict()
                             </main>
                             <script>
                                 const users = 
-                    """ + Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(users)) +
+                    """ + Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(mockUsers)) +
                     """
                     ;
                                 let form = document.getElementById("form");
@@ -108,7 +109,7 @@ builder.Services.AddOpenIddict()
                                     var elem = document.createElement("input");
                                     elem.type = "submit";
                                     elem.name = "user";
-                                    elem.value = user;
+                                    elem.value = user.Id;
                                     form.appendChild(elem);
                                 }
                             </script>
@@ -120,12 +121,20 @@ builder.Services.AddOpenIddict()
                     return;
                 }
 
-                var user = request.Query["user"].Single()!;
+                var user = request.Query["user"].SingleOrDefault();
+                var mockUser = mockUsers.FirstOrDefault(u => u.Id == user);
+                if (mockUser == null) {
+                    context.HandleRequest();
+                    await request.HttpContext.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes("Invalid user selected."));
+                    return;
+                }
                 var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType);
-                identity.AddClaim(new Claim(Claims.Subject, user));
-                identity.AddClaim(new Claim(Claims.Name, user));
-                identity.AddClaim(new Claim(Claims.Email, user+"@mock.idp"));
-                identity.AddClaim(new Claim(Claims.Role, "hardcoded"));
+                identity.AddClaim(new Claim(Claims.Subject, mockUser.Id));
+                identity.AddClaim(new Claim(Claims.Name, mockUser.Name));
+                identity.AddClaim(new Claim(Claims.Email, mockUser.Email));
+                foreach(var role in mockUser.Roles) {
+                    identity.AddClaim(new Claim(Claims.Role, role));
+                }
                 identity.SetScopes(context.Request.GetScopes());
 
                 foreach (var claim in identity.Claims)
