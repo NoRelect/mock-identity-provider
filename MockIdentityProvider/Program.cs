@@ -53,6 +53,11 @@ builder.Services.AddOpenIddict()
         options.AddEventHandler<HandleUserinfoRequestContext>(builder =>
             builder.UseInlineHandler(context =>
             {
+                if(context.Principal.HasScope("profile"))
+                {
+                    var name = context.Principal.FindFirstValue(Claims.Name);
+                    context.Claims.Add(Claims.Name, new OpenIddictParameter(name));
+                }
                 if(context.Principal.HasScope("role"))
                 {
                     var role = context.Principal.FindFirstValue(Claims.Role);
