@@ -14,6 +14,18 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+users:
+  - id: user
+    name: User
+    email: user@mock.idp
+    roles:
+      - users
+  - id: admin
+    name: Admin
+    email: admin@mock.idp
+    roles:
+      - admins
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: false

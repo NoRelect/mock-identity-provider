@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mock-identity-provider.fullname" . }}-appsettings
+  labels:
+    {{- include "mock-identity-provider.labels" . | nindent 4 }}
+data:
+  appsettings.json: |
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning"
+        }
+      },
+      "Users": {{ .Values.users | toJson }}
+    }
