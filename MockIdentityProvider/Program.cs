@@ -10,6 +10,8 @@ using static OpenIddict.Server.OpenIddictServerEvents;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var issuerUrl = builder.Configuration.GetSection("Issuer").Get<string>()
+    ?? throw new InvalidOperationException("Issuer URL must be set.");
 var mockUsers = builder.Configuration.GetSection("Users").Get<List<MockUser>>() ?? [];
 
 builder.Services.AddOpenIddict()
@@ -32,6 +34,7 @@ builder.Services.AddOpenIddict()
 
         options.RegisterScopes("profile", "email", "role");
 
+        options.SetIssuer(issuerUrl);
         options.EnableDegradedMode();
         options.UseAspNetCore()
             .DisableTransportSecurityRequirement();
