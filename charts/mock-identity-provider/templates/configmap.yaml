@@ -13,5 +13,6 @@ data:
           "Microsoft.AspNetCore": "Warning"
         }
       },
+      "Issuer": {{ .Values.issuer | quote }},
       "Users": {{ .Values.users | toJson }}
     }
