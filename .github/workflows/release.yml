@@ -37,7 +37,7 @@ jobs:
         if: steps.semrel.outputs.version != ''
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/norelect/nephelite
+          images: ghcr.io/norelect/mock-identity-provider
           flavor: |
             latest=auto
           tags: |
