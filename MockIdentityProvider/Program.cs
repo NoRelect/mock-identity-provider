@@ -31,6 +31,7 @@ builder.Services.AddOpenIddict()
         options.SetAuthorizationEndpointUris("/authorize");
         options.SetTokenEndpointUris("/token");
         options.SetUserinfoEndpointUris("/user-info");
+        options.SetLogoutEndpointUris("/logout");
 
         options.RegisterScopes("profile", "email", "role");
 
@@ -50,6 +51,13 @@ builder.Services.AddOpenIddict()
             builder.UseInlineHandler(context =>
             {
                 // Allow any token request
+                return default;
+            }));
+
+        options.AddEventHandler<ValidateLogoutRequestContext>(builder =>
+            builder.UseInlineHandler(context =>
+            {
+                // Allow any logout request
                 return default;
             }));
 
