@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 var issuerUrl = builder.Configuration.GetSection("Issuer").Get<string>()
     ?? throw new InvalidOperationException("Issuer URL must be set.");
 var mockUsers = builder.Configuration.GetSection("Users").Get<List<MockUser>>() ?? [];
+mockUsers.Add(new MockUser { Id = "error", Name = "error" });
 
 builder.Services.AddOpenIddict()
     .AddServer(options =>
@@ -108,7 +109,7 @@ builder.Services.AddOpenIddict()
                                 </form>
                             </main>
                             <script>
-                                const users = 
+                                const users =
                     """ + Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(mockUsers)) +
                     """
                     ;
@@ -138,6 +139,13 @@ builder.Services.AddOpenIddict()
                 }
 
                 var user = request.Query["user"].SingleOrDefault();
+
+                if (user == "error")
+                {
+                    context.Reject("error-name", "This is the error description", "https://example.com");
+                    return;
+                }
+
                 var mockUser = mockUsers.FirstOrDefault(u => u.Id == user);
                 if (mockUser == null) {
                     context.HandleRequest();
