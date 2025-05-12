@@ -22,6 +22,7 @@ builder.Services.AddOpenIddict()
         options.IgnoreGrantTypePermissions();
         options.IgnoreResponseTypePermissions();
         options.IgnoreScopePermissions();
+        options.AllowAuthorizationCodeFlow();
         options.AllowHybridFlow();
         options.AllowImplicitFlow();
         options.AllowRefreshTokenFlow();
@@ -38,9 +39,11 @@ builder.Services.AddOpenIddict()
         options.SetEndSessionEndpointUris("/logout");
 
         options.RegisterScopes("profile", "email", "role");
+        options.DisableScopeValidation();
 
         options.SetIssuer(issuerUrl);
         options.EnableDegradedMode();
+        options.DisableAccessTokenEncryption();
         options.UseAspNetCore()
             .DisableTransportSecurityRequirement();
 
@@ -159,6 +162,8 @@ builder.Services.AddOpenIddict()
                 identity.AddClaim(new Claim(Claims.Subject, mockUser.Id));
                 identity.AddClaim(new Claim(Claims.Name, mockUser.Name));
                 identity.AddClaim(new Claim(Claims.Email, mockUser.Email));
+                if (!string.IsNullOrEmpty(context.Request.ClientId))
+                        identity.AddClaim(new Claim(Claims.Audience, context.Request.ClientId));
                 foreach(var role in mockUser.Roles) {
                     identity.AddClaim(new Claim(Claims.Role, role));
                 }
@@ -166,7 +171,7 @@ builder.Services.AddOpenIddict()
 
                 foreach (var claim in identity.Claims)
                 {
-                    claim.SetDestinations(Destinations.AccessToken);
+                    claim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
                 }
 
                 context.Principal = new ClaimsPrincipal(identity);
@@ -178,30 +183,35 @@ builder.Services.AddOpenIddict()
                 var request = context.Transaction.GetHttpRequest() ??
                     throw new InvalidOperationException("The ASP.NET Core request cannot be retrieved.");
 
-                var user = context.Request.Username;
-
-                var mockUser = mockUsers.FirstOrDefault(u => u.Id == user);
-                if (mockUser == null)
+                if (context.Request.GrantType == GrantTypes.Password)
                 {
-                    context.Reject("Invalid user selected.");
-                    context.HandleRequest();
+                    var user = context.Request.Username;
+
+                    var mockUser = mockUsers.FirstOrDefault(u => u.Id == user);
+                    if (mockUser == null)
+                    {
+                        context.Reject("Invalid user selected.");
+                        return ValueTask.CompletedTask;
+                    }
+                    var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType);
+                    identity.AddClaim(new Claim(Claims.Subject, mockUser.Id));
+                    identity.AddClaim(new Claim(Claims.Name, mockUser.Name));
+                    identity.AddClaim(new Claim(Claims.Email, mockUser.Email));
+                    if (!string.IsNullOrEmpty(context.Request.ClientId))
+                        identity.AddClaim(new Claim(Claims.Audience, context.Request.ClientId));
+                    foreach(var role in mockUser.Roles) {
+                        identity.AddClaim(new Claim(Claims.Role, role));
+                    }
+                    identity.SetScopes(context.Request.GetScopes());
+
+                    foreach (var claim in identity.Claims)
+                    {
+                        claim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
+                    }
+
+                    context.Principal = new ClaimsPrincipal(identity);
                     return ValueTask.CompletedTask;
                 }
-                var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType);
-                identity.AddClaim(new Claim(Claims.Subject, mockUser.Id));
-                identity.AddClaim(new Claim(Claims.Name, mockUser.Name));
-                identity.AddClaim(new Claim(Claims.Email, mockUser.Email));
-                foreach(var role in mockUser.Roles) {
-                    identity.AddClaim(new Claim(Claims.Role, role));
-                }
-                identity.SetScopes(context.Request.GetScopes());
-
-                foreach (var claim in identity.Claims)
-                {
-                    claim.SetDestinations(Destinations.AccessToken);
-                }
-
-                context.Principal = new ClaimsPrincipal(identity);
                 return ValueTask.CompletedTask;
             }));
     });
