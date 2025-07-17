@@ -22,14 +22,30 @@ builder.Services.AddOpenIddict()
         options.IgnoreGrantTypePermissions();
         options.IgnoreResponseTypePermissions();
         options.IgnoreScopePermissions();
-        options.AllowAuthorizationCodeFlow();
-        options.AllowHybridFlow();
-        options.AllowImplicitFlow();
-        options.AllowRefreshTokenFlow();
-        options.AllowPasswordFlow();
-        options.AcceptAnonymousClients();
-        options.AllowNoneFlow();
-
+        if (builder.Configuration.GetValue("AllowAuthorizationCodeGrant", true))
+        {
+            options.AllowAuthorizationCodeFlow();
+        }
+        if (builder.Configuration.GetValue("AllowHybridFlow", true))
+        {
+            options.AllowHybridFlow();
+        }
+        if (builder.Configuration.GetValue("AllowImplicitFlow", true))
+        {
+            options.AllowImplicitFlow();
+        }
+        if (builder.Configuration.GetValue("AllowRefreshTokenFlow", true))
+        {
+            options.AllowRefreshTokenFlow();
+        }
+        if (builder.Configuration.GetValue("AllowPasswordFlow", true))
+        {
+            options.AllowPasswordFlow();
+        }
+        if (builder.Configuration.GetValue("AllowNoneFlow", true))
+        {
+            options.AllowNoneFlow();
+        }
         options.AddEphemeralEncryptionKey();
         options.AddEphemeralSigningKey();
 
@@ -41,6 +57,7 @@ builder.Services.AddOpenIddict()
         options.RegisterScopes("profile", "email", "role");
         options.DisableScopeValidation();
 
+        options.AcceptAnonymousClients();
         options.SetIssuer(issuerUrl);
         options.EnableDegradedMode();
         options.DisableAccessTokenEncryption();
