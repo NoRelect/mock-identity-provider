@@ -71,14 +71,14 @@ builder.Services.AddOpenIddict()
         options.AddEventHandler<HandleUserInfoRequestContext>(builder =>
             builder.UseInlineHandler(context =>
             {
-                if(context.Principal.HasScope("profile"))
+                if(context.AccessTokenPrincipal.HasScope("profile"))
                 {
-                    var name = context.Principal.FindFirstValue(Claims.Name);
+                    var name = context.AccessTokenPrincipal.FindFirstValue(Claims.Name);
                     context.Claims.Add(Claims.Name, new OpenIddictParameter(name));
                 }
-                if(context.Principal.HasScope("role"))
+                if(context.AccessTokenPrincipal.HasScope("role"))
                 {
-                    var role = context.Principal.FindFirstValue(Claims.Role);
+                    var role = context.AccessTokenPrincipal.FindFirstValue(Claims.Role);
                     context.Claims.Add(Claims.Role, new OpenIddictParameter(role));
                 }
                 return default;
@@ -216,10 +216,19 @@ builder.Services.AddOpenIddict()
             }));
     });
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy => policy
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowAnyOrigin());
+});
+
 var app = builder.Build();
 
 app.UseForwardedHeaders();
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseCors();
 
 app.Run();
