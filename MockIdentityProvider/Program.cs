@@ -216,6 +216,9 @@ builder.Services.AddOpenIddict()
             }));
     });
 
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy => policy
