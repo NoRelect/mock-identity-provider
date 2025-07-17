@@ -22,7 +22,7 @@ builder.Services.AddOpenIddict()
         options.IgnoreGrantTypePermissions();
         options.IgnoreResponseTypePermissions();
         options.IgnoreScopePermissions();
-        if (builder.Configuration.GetValue("AllowAuthorizationCodeGrant", true))
+        if (builder.Configuration.GetValue("AllowAuthorizationCodeFlow", true))
         {
             options.AllowAuthorizationCodeFlow();
         }
