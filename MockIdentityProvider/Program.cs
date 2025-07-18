@@ -56,6 +56,7 @@ builder.Services.AddOpenIddict()
         options.SetTokenEndpointUris("/token");
         options.SetUserInfoEndpointUris("/user-info");
         options.SetEndSessionEndpointUris("/logout");
+        options.SetRevocationEndpointUris("/revoke");
 
         options.RegisterScopes("profile", "email", "role");
         options.DisableScopeValidation();
@@ -78,6 +79,13 @@ builder.Services.AddOpenIddict()
             builder.UseInlineHandler(context =>
             {
                 // Allow any token request
+                return default;
+            }));
+
+        options.AddEventHandler<ValidateRevocationRequestContext>(builder =>
+            builder.UseInlineHandler(context =>
+            {
+                // Allow any revocation request
                 return default;
             }));
 
@@ -238,14 +246,18 @@ builder.Services.AddOpenIddict()
                 return ValueTask.CompletedTask;
             }));
 
-        options.AddEventHandler<HandleEndSessionRequestContext>(builder =>
-            builder.UseInlineHandler(async context =>
+        options.AddEventHandler<HandleRevocationRequestContext>(builder =>
+            builder.UseInlineHandler(context =>
             {
-                var request = context.Transaction.GetHttpRequest() ??
-                    throw new InvalidOperationException("The ASP.NET Core request cannot be retrieved.");
+                context.HandleRequest();
+                return ValueTask.CompletedTask;
+            }));
 
+        options.AddEventHandler<HandleEndSessionRequestContext>(builder =>
+            builder.UseInlineHandler(context =>
+            {
                 context.SignOut();
-                await request.HttpContext.SignOutAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                return ValueTask.CompletedTask;
             }));
     });
 
