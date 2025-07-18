@@ -88,12 +88,12 @@ builder.Services.AddOpenIddict()
         options.AddEventHandler<HandleUserInfoRequestContext>(builder =>
             builder.UseInlineHandler(context =>
             {
-                if(context.AccessTokenPrincipal.HasScope("profile"))
+                if (context.AccessTokenPrincipal.HasScope("profile"))
                 {
                     var name = context.AccessTokenPrincipal.FindFirstValue(Claims.Name);
                     context.Claims.Add(Claims.Name, new OpenIddictParameter(name));
                 }
-                if(context.AccessTokenPrincipal.HasScope("role"))
+                if (context.AccessTokenPrincipal.HasScope("role"))
                 {
                     var role = context.AccessTokenPrincipal.FindFirstValue(Claims.Role);
                     context.Claims.Add(Claims.Role, new OpenIddictParameter(role));
@@ -170,7 +170,8 @@ builder.Services.AddOpenIddict()
                 }
 
                 var mockUser = mockUsers.FirstOrDefault(u => u.Id == user);
-                if (mockUser == null) {
+                if (mockUser == null)
+                {
                     context.HandleRequest();
                     await request.HttpContext.Response.BodyWriter.WriteAsync(Encoding.UTF8.GetBytes("Invalid user selected."));
                     return;
@@ -180,8 +181,9 @@ builder.Services.AddOpenIddict()
                 identity.AddClaim(new Claim(Claims.Name, mockUser.Name));
                 identity.AddClaim(new Claim(Claims.Email, mockUser.Email));
                 if (!string.IsNullOrEmpty(context.Request.ClientId))
-                        identity.AddClaim(new Claim(Claims.Audience, context.Request.ClientId));
-                foreach(var role in mockUser.Roles) {
+                    identity.AddClaim(new Claim(Claims.Audience, context.Request.ClientId));
+                foreach (var role in mockUser.Roles)
+                {
                     identity.AddClaim(new Claim(Claims.Role, role));
                 }
                 identity.SetScopes(context.Request.GetScopes());
@@ -216,7 +218,8 @@ builder.Services.AddOpenIddict()
                     identity.AddClaim(new Claim(Claims.Email, mockUser.Email));
                     if (!string.IsNullOrEmpty(context.Request.ClientId))
                         identity.AddClaim(new Claim(Claims.Audience, context.Request.ClientId));
-                    foreach(var role in mockUser.Roles) {
+                    foreach (var role in mockUser.Roles)
+                    {
                         identity.AddClaim(new Claim(Claims.Role, role));
                     }
                     identity.SetScopes(context.Request.GetScopes());
@@ -229,6 +232,12 @@ builder.Services.AddOpenIddict()
                     context.Principal = new ClaimsPrincipal(identity);
                     return ValueTask.CompletedTask;
                 }
+                return ValueTask.CompletedTask;
+            }));
+
+        options.AddEventHandler<HandleEndSessionRequestContext>(builder =>
+            builder.UseInlineHandler(context =>
+            {
                 return ValueTask.CompletedTask;
             }));
     });
