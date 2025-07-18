@@ -15,10 +15,13 @@
                 </ul>
             </nav>
             <pre id="result" style="padding: 15px">Fetching user info...</pre>
+            <div id="logout"></div>
         </main>
         <script>
             async function user_info() {
-                var access_token = new URLSearchParams(window.location.hash.slice(1)).get('access_token');
+                var url_params = new URLSearchParams(window.location.hash.slice(1));
+                var access_token = url_params.get('access_token');
+                var id_token = url_params.get('id_token');
                 let r = await fetch("/user-info", {
                     method: 'GET',
                     headers: {
@@ -29,8 +32,16 @@
                 let t = await r.text();
                 if (r.ok) {
                     document.getElementById("result").innerText = t;
+                    var logoutButton = document.createElement('a');
+                    logoutButton.innerText = "Logout";
+                    logoutButton.href = "/logout?id_token_hint="+id_token + "&post_logout_redirect_uri=" + window.location.origin;
+                    document.getElementById("logout").appendChild(logoutButton);
                 } else {
                     document.getElementById("result").innerText = "An error occurred";
+                    var logoutButton = document.createElement('a');
+                    logoutButton.innerText = "Go Home";
+                    logoutButton.href = "/";
+                    document.getElementById("logout").appendChild(logoutButton);
                 }
             }
             user_info();

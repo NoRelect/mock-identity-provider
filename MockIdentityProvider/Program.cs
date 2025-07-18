@@ -2,9 +2,12 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.IdentityModel.Tokens;
 using MockIdentityProvider.Models;
 using OpenIddict.Abstractions;
+using OpenIddict.Server;
+using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Server.OpenIddictServerEvents;
 
@@ -236,9 +239,13 @@ builder.Services.AddOpenIddict()
             }));
 
         options.AddEventHandler<HandleEndSessionRequestContext>(builder =>
-            builder.UseInlineHandler(context =>
+            builder.UseInlineHandler(async context =>
             {
-                return ValueTask.CompletedTask;
+                var request = context.Transaction.GetHttpRequest() ??
+                    throw new InvalidOperationException("The ASP.NET Core request cannot be retrieved.");
+
+                context.SignOut();
+                await request.HttpContext.SignOutAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             }));
     });
 
