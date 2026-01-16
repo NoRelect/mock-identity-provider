@@ -1,4 +1,3 @@
-````markdown
 # mock-identity-provider
 
 A lightweight **Mock Identity Provider (IdP)** for **OpenID Connect (OIDC)** and **OAuth 2.0**, built on **OpenIddict**.  
@@ -170,14 +169,3 @@ This project is intended **only** for:
 
 MIT
 
-```
-
-If you want, I can also:
-- Add **sequence diagrams**
-- Add **example JWT payloads**
-- Add **Docker support**
-- Add **PKCE examples**
-- Add **scope-to-claim mapping documentation**
-
-Just tell me.
-```
