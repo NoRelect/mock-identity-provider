@@ -1,7 +1,7 @@
 # mock-identity-provider
 
 A lightweight **Mock Identity Provider (IdP)** for **OpenID Connect (OIDC)** and **OAuth 2.0**, built on **OpenIddict**.  
-Designed for **local development**, **integration testing**, **automation**, and **security testing** where a real IdP would be overkill.
+Designed for **local development**, **integration testing** and **automation**, where a real IdP would be overkill.
 
 ---
 
@@ -151,7 +151,6 @@ This project is intended **only** for:
 * Local development
 * Automated tests
 * CI/CD pipelines
-* Security tooling
 
 ---
 
@@ -160,12 +159,11 @@ This project is intended **only** for:
 * Frontend development without a real IdP
 * Backend integration tests
 * OAuth/OIDC client testing
-* Security testing and demos
 * Mocking Entra ID / Keycloak / Auth0 behavior
 
 ---
 
 ## License
 
-MIT
+GNU General Public License v3.0
 
