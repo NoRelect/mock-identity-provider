@@ -13,6 +13,13 @@ data:
           "Microsoft.AspNetCore": "Warning"
         }
       },
+      "AllowedHosts": "*",
       "Issuer": {{ .Values.issuer | quote }},
+      "AllowAuthorizationCodeFlow": {{ .Values.security.allowAuthorizationCodeFlow }},
+      "AllowHybridFlow": {{ .Values.security.allowHybridFlow }},
+      "AllowImplicitFlow": {{ .Values.security.allowImplicitFlow }},
+      "AllowRefreshTokenFlow": {{ .Values.security.allowRefreshTokenFlow }},
+      "AllowPasswordFlow": {{ .Values.security.allowPasswordFlow }},
+      "AllowNoneFlow": {{ .Values.security.allowNoneFlow }},
       "Users": {{ .Values.users | toJson }}
     }
