@@ -25,6 +25,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: set lower case owner name
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
+
       - name: Semantic Release
         uses: go-semantic-release/action@v1
         id: semrel
@@ -37,7 +43,7 @@ jobs:
         if: steps.semrel.outputs.version != ''
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/mock-identity-provider
+          images: ghcr.io/${{ env.OWNER_LC }}/mock-identity-provider
           flavor: |
             latest=auto
           tags: |
