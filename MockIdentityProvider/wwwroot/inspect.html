@@ -1,50 +1,147 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="color-scheme" content="light dark">
-        <link rel="stylesheet" href="css/pico.min.css">
-        <title>MIdP | Inspect</title>
-    </head>
-    <body>
-        <main class="container">
-            <nav>
-                <ul>
-                    <li><strong>Mock IdP - User Info</strong></li>
-                </ul>
-            </nav>
-            <pre id="result" style="padding: 15px">Fetching user info...</pre>
-            <div id="logout"></div>
-        </main>
-        <script>
-            async function user_info() {
-                var url_params = new URLSearchParams(window.location.hash.slice(1));
-                var access_token = url_params.get('access_token');
-                var id_token = url_params.get('id_token');
-                let r = await fetch("/user-info", {
-                    method: 'GET',
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" href="css/pico.min.css">
+    <title>Mock IdP | Inspect</title>
+</head>
+
+<body>
+<main class="container">
+    <header>
+        <nav>
+            <ul>
+                <li><strong>Mock IdP</strong></li>
+            </ul>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/.well-known/openid-configuration">Discovery</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <article>
+        <hgroup>
+            <h1>Inspect</h1>
+            <p class="secondary">Reads tokens from the URL fragment and calls <code>/user-info</code>.</p>
+        </hgroup>
+
+        <details open>
+            <summary>Result</summary>
+            <pre id="result" style="padding: 1rem; margin-top: .75rem;">Loading...</pre>
+        </details>
+
+        <details>
+            <summary>Raw callback data</summary>
+            <pre id="raw" style="padding: 1rem; margin-top: .75rem;"></pre>
+        </details>
+
+        <div class="grid" style="margin-top: 1rem;">
+            <a role="button" id="logoutBtn" class="secondary" href="/" style="display:none;">Logout</a>
+            <a role="button" id="homeBtn" href="/" style="display:none;">Home</a>
+            <a role="button" id="retryBtn" href="/" style="display:none;">Retry demo auth</a>
+        </div>
+    </article>
+</main>
+
+<script>
+    const resultEl = document.getElementById("result");
+    const rawEl = document.getElementById("raw");
+
+    const logoutBtn = document.getElementById("logoutBtn");
+    const homeBtn = document.getElementById("homeBtn");
+    const retryBtn = document.getElementById("retryBtn");
+
+    const fragment = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : "";
+
+    rawEl.innerText =
+        `origin: ${window.location.origin}\n` +
+        `path: ${window.location.pathname}\n` +
+        `hash: #${fragment || "(empty)"}`;
+
+    const params = new URLSearchParams(fragment);
+
+    const error = params.get("error");
+    const errorDescription = params.get("error_description");
+    const accessToken = params.get("access_token");
+    const idToken = params.get("id_token");
+
+    const buildRetryUrl = () => {
+        const baseUrl = window.location.origin;
+        const sp = new URLSearchParams({
+            client_id: "test",
+            scope: "openid profile email role",
+            response_type: "id_token token",
+            response_mode: "fragment",
+            redirect_uri: `${baseUrl}/inspect.html`,
+            nonce: "hardcoded"
+        });
+        return `/authorize?${sp.toString()}`;
+    };
+
+    retryBtn.href = buildRetryUrl();
+
+    if (error) {
+        resultEl.innerText =
+            `Authorization error\n\n` +
+            `error: ${error}\n` +
+            (errorDescription ? `error_description: ${errorDescription}\n` : "") +
+            `\nMake sure your /authorize demo uses response_type "id_token token" and response_mode=fragment.`;
+
+        homeBtn.style.display = "";
+        retryBtn.style.display = "";
+    } else if (!accessToken) {
+        resultEl.innerText =
+            `No access_token found in URL fragment.\n\n` +
+            `This page expects implicit/hybrid style response with tokens in the fragment.\n` +
+            `Use response_type "id_token token" and response_mode "fragment".`;
+
+        homeBtn.style.display = "";
+        retryBtn.style.display = "";
+    } else {
+        (async () => {
+            try {
+                const r = await fetch("/user-info", {
+                    method: "GET",
                     headers: {
-                        'Authorization': "Bearer " + access_token,
-                        'Content-Type': 'application/json'
+                        Authorization: `Bearer ${accessToken}`
                     }
-                })
-                let t = await r.text();
+                });
+
+                const t = await r.text();
+
                 if (r.ok) {
-                    document.getElementById("result").innerText = t;
-                    var logoutButton = document.createElement('a');
-                    logoutButton.innerText = "Logout";
-                    logoutButton.href = "/logout?id_token_hint="+id_token + "&post_logout_redirect_uri=" + window.location.origin;
-                    document.getElementById("logout").appendChild(logoutButton);
+                    resultEl.innerText = t;
+
+                    if (idToken) {
+                        logoutBtn.href = `/logout?id_token_hint=${encodeURIComponent(idToken)}&post_logout_redirect_uri=${encodeURIComponent(window.location.origin)}`;
+                        logoutBtn.style.display = "";
+                    } else {
+                        homeBtn.style.display = "";
+                    }
                 } else {
-                    document.getElementById("result").innerText = "An error occurred";
-                    var logoutButton = document.createElement('a');
-                    logoutButton.innerText = "Go Home";
-                    logoutButton.href = "/";
-                    document.getElementById("logout").appendChild(logoutButton);
+                    resultEl.innerText =
+                        `UserInfo request failed\n\n` +
+                        `status: ${r.status}\n\n` +
+                        `${t}`;
+
+                    homeBtn.style.display = "";
+                    retryBtn.style.display = "";
                 }
+            } catch (e) {
+                resultEl.innerText =
+                    `Request failed\n\n` +
+                    `${e}`;
+
+                homeBtn.style.display = "";
+                retryBtn.style.display = "";
             }
-            user_info();
-        </script>
-    </body>
+        })();
+    }
+</script>
+</body>
 </html>

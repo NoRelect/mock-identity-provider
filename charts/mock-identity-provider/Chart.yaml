@@ -2,5 +2,5 @@ apiVersion: v2
 name: mock-identity-provider
 description: A Mock Identity Provider for testing openid connect applications
 type: application
-version: 0.0.0
-appVersion: "0.0.0"
+version: 2.0.0
+appVersion: "2.0.0"

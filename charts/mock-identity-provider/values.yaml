@@ -19,13 +19,35 @@ users:
   - id: user
     name: User
     email: user@mock.idp
-    roles:
+    roles: 
       - users
+    claims:
+      oid: 2c9d3e29-bcb5-46a1-bf66-83ef6f6dc5d9
+      tid: 25a1e8e6-dc90-4647-94f5-333bafc75204
+      given_name: User
+      family_name: GLOBAL
+      department: IT
+      preferred_username: user@mock.idp
   - id: admin
     name: Admin
     email: admin@mock.idp
-    roles:
+    roles: 
       - admins
+    claims:
+      oid: 08e4886b-5a43-476d-bbf1-30a32c412149
+      tid: 25a1e8e6-dc90-4647-94f5-333bafc75204
+      given_name: Administrator
+      family_name: GLOBAL
+      department: IT
+      preferred_username: admin@mock.idp
+
+security:
+  allowAuthorizationCodeFlow: true
+  allowHybridFlow: true
+  allowImplicitFlow: true
+  allowRefreshTokenFlow: true
+  allowPasswordFlow: true
+  allowNoneFlow: true
 
 serviceAccount:
   # Specifies whether a service account should be created
