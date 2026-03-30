@@ -5,6 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="OpenIddict.AspNetCore" Version="7.4.0" />
-    <PackageVersion Include="Scriban" Version="7.0.0" />
+    <PackageVersion Include="Scriban" Version="7.0.6" />
   </ItemGroup>
 </Project>
