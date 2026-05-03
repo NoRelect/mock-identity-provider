@@ -1,0 +1,34 @@
+{
+  "issuer": "http://localhost:8000",
+  "key_size": 4096,
+  "users": [
+    {
+      "sub": "user",
+      "claims": {
+        "name": "User",
+        "email": "normal.user@example.com"
+      }
+    },
+    {
+      "sub": "admin",
+      "claims": {
+        "name": "Administrator",
+        "email": "administrator@example.com"
+      }
+    },
+    {
+      "sub": "demo",
+      "claims": {
+        "name": "Demo",
+        "email": "demo@example.com",
+        "you": [
+          "can",
+          {
+            "add": "arbitrary",
+            "objects": 5
+          }
+        ]
+      }
+    }
+  ]
+}

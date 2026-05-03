@@ -36,12 +36,9 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: "ASPNETCORE_FORWARDEDHEADERS_ENABLED"
-              value: "true"
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 8000
               protocol: TCP
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
@@ -50,19 +47,19 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - name: appsettings
-              mountPath: /app/appsettings.json
-              subPath: appsettings.json
+            - name: config
+              mountPath: /config.json
+              subPath: config.json
           {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-        - name: appsettings
+        - name: config
           configMap:
-            name: {{ include "mock-identity-provider.fullname" . }}-appsettings
+            name: {{ include "mock-identity-provider.fullname" . }}-config
             items:
-              - key: appsettings.json
-                path: appsettings.json
+              - key: config.json
+                path: config.json
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}

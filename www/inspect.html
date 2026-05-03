@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mock IdP</title>
+    <link rel="icon" href="/img/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="/css/style.css" />
+    <script type="text/javascript" src="/js/config.js" defer></script>
+    <script type="text/javascript" src="/js/inspect.js" defer></script>
+</head>
+
+<body>
+    <main class="container">
+        <header>
+            <hgroup>
+                <h1>Mock IdP</h1>
+                <p>
+                    Issuer:
+                    <a href=".well-known/openid-configuration" target="_blank">
+                        <code class="replace-issuer">ISSUER_PLACEHOLDER</code>
+                    </a>
+                </p>
+            </hgroup>
+        </header>
+
+        <h3>Inspect</h3>
+
+        <div class="grid">
+            <div>
+                <section>
+                    <h5>Access Token</h5>
+                    <pre id="decodedAccessToken" class="container-fluid"></pre>
+                </section>
+            </div>
+            <div>
+                <section>
+                    <h5>ID Token</h5>
+                    <pre id="decodedIdToken" class="container-fluid"></pre>
+                </section>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div>
+                <section>
+                    <code id="accessToken" class="container-fluid"></code>
+                </section>
+            </div>
+            <div>
+                <section>
+                    <code id="idToken" class="container-fluid"></code>
+                </section>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>

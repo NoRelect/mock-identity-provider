@@ -14,18 +14,26 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-issuer: "https://mock.idp"
-users:
-  - id: user
-    name: User
-    email: user@mock.idp
-    roles:
-      - users
-  - id: admin
-    name: Admin
-    email: admin@mock.idp
-    roles:
-      - admins
+config:
+  issuer: "https://mock.idp"
+  key_size: 4096
+  users:
+    - sub: user
+      claims:
+        name: User
+        email: normal.user@example.com
+    - sub: admin
+      claims:
+        name: Administrator
+        email: administrator@example.com
+    - sub: demo
+      claims:
+        name: Demo
+        email: demo@example.com
+        you:
+          - can
+          - add: arbitrary
+            objects: 5
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -54,7 +62,7 @@ securityContext: {}
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8000
 
 ingress:
   enabled: false
