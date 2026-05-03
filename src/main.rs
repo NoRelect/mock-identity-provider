@@ -82,6 +82,7 @@ async fn main() {
     }
 
     info!("Loaded configuration");
+    info!("Generating RSA key, this may take some time...");
 
     let mut rng = rsa::rand_core::OsRng;
     let rsa_priv_key =
