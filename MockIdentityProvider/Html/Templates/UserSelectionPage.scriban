@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="css/pico.min.css">
+  <title>Mock IdP</title>
+</head>
+<body>
+<main class="container">
+
+<header>
+  <hgroup>
+    <h1>Mock Identity Provider</h1>
+    <p class="meta">Issuer: <code>{{ issuer }}</code></p>
+  </hgroup>
+</header>
+
+<label>
+  Search user
+  <input id="search" type="search" placeholder="id, name, email, role, claim">
+</label>
+
+<section id="users">
+  {{ for u in users }}
+  <article class="user" data-search="{{ u.search }}">
+    <h3>{{ u.name ?? u.id }}</h3>
+    {{ if u.email }}
+      <p class="meta">{{ u.email }}</p>
+    {{ end }}
+
+    <p>
+      <small>ID: <code>{{ u.id }}</code></small>
+    </p>
+
+    {{ if u.roles.size > 0 }}
+    <p>
+      {{ for r in u.roles }}
+        <code>{{ r }}</code>
+      {{ end }}
+    </p>
+    {{ end }}
+
+    <button type="button" onclick="submitAs('{{ u.id }}')" {{ if u.id == 'error' }}class="secondary"{{ end }}>
+      {{ if u.id == 'error' }}Trigger error{{ else }}Continue{{ end }}
+    </button>
+  </article>
+  {{ end }}
+</section>
+
+<p id="empty" class="meta" style="display:none;">No users match your search.</p>
+
+<form id="form" method="get"></form>
+
+</main>
+
+<script>
+const search = document.getElementById('search');
+const users = document.querySelectorAll('.user');
+const empty = document.getElementById('empty');
+const form = document.getElementById('form');
+
+const qs = new URLSearchParams(window.location.search);
+for (const [k, v] of qs) {
+  if (k === 'user') continue;
+  const i = document.createElement('input');
+  i.type = 'hidden';
+  i.name = k;
+  i.value = v;
+  form.appendChild(i);
+}
+
+function submitAs(userId) {
+  const b = document.createElement('button');
+  b.type = 'submit';
+  b.name = 'user';
+  b.value = userId;
+  form.appendChild(b);
+  b.click();
+}
+
+search.addEventListener('input', () => {
+  const q = search.value.toLowerCase();
+  let visible = 0;
+
+  users.forEach(u => {
+    const match = u.dataset.search.includes(q);
+    u.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+
+  empty.style.display = visible ? 'none' : '';
+});
+</script>
+
+</body>
+</html>

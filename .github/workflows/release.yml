@@ -30,6 +30,13 @@ jobs:
           echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
         env:
           OWNER: '${{ github.repository_owner }}'
+        uses: actions/checkout@v6
+
+      - name: set lower case owner name
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
 
       - name: Semantic Release
         uses: go-semantic-release/action@v1
@@ -40,6 +47,7 @@ jobs:
       - name: Docker meta
         id: meta
         if: steps.semrel.outputs.version != ''
+        uses: docker/metadata-action@v6
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ env.OWNER_LC }}/mid
@@ -83,3 +91,16 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             ${{ steps.meta.outputs.labels }}
+
+      - name: Push helm chart
+        if: steps.semrel.outputs.version != ''
+        uses: appany/helm-oci-chart-releaser@v0.5.0
+        with:
+          name: mock-identity-provider
+          repository: ${{ env.OWNER_LC }}/charts
+          tag: ${{ steps.semrel.outputs.version }}
+          app_version: ${{ steps.semrel.outputs.version }}
+          path: charts/mock-identity-provider
+          registry: ghcr.io
+          registry_username: ${{ github.repository_owner }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}

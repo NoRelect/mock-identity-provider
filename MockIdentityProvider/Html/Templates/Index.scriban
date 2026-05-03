@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="css/pico.min.css">
+  <title>{{ title | html.escape }}</title>
+</head>
+<body>
+<main class="container">
+
+  <header>
+    <nav>
+      <ul>
+        <li><strong>{{ brand | html.escape }}</strong></li>
+      </ul>
+      <ul>
+        <li><a href="/.well-known/openid-configuration">OpenID Configuration</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <article>
+    <hgroup>
+      <h1>{{ heading | html.escape }}</h1>
+      <p>{{ description | html.escape }}</p>
+    </hgroup>
+
+    <div class="grid">
+      <div>
+        <strong>Issuer</strong>
+        <div><code>{{ issuer | html.escape }}</code></div>
+      </div>
+      <div>
+        <strong>Audience</strong>
+        <div><code>{{ default_client_id | html.escape }}</code></div>
+      </div>
+      <div>
+        <strong>Registered scopes</strong>
+        <div><code>{{ registered_scopes | html.escape }}</code></div>
+      </div>
+    </div>
+  </article>
+
+  <article>
+    <h2>Quick actions</h2>
+
+    <div class="grid">
+      <a role="button" href="/.well-known/openid-configuration">OpenID Discovery</a>
+      <a role="button" id="authorizeLink">Authorize (demo)</a>
+    </div>
+
+    <details style="margin-top:1rem;">
+      <summary>Authorize URL</summary>
+      <pre><code id="authorizeUrl"></code></pre>
+    </details>
+
+    <details style="margin-top:1rem;">
+      <summary>Password grant (automation)</summary>
+      <pre><code id="passwordCurl"></code></pre>
+    </details>
+  </article>
+
+  <article>
+    <h2>Endpoints</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Path</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ for e in endpoints }}
+        <tr>
+          <td><code>{{ e.path | html.escape }}</code></td>
+          <td>{{ e.purpose | html.escape }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </article>
+
+  <article>
+    <h2>Enabled flows</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Flow</th>
+          <th>Enabled</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ for f in flows }}
+        <tr>
+          <td>{{ f.name | html.escape }}</td>
+          <td>{{ if f.enabled }}✅{{ else }}❌{{ end }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </article>
+
+  <article>
+    <h2>Users</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Roles</th>
+          <th>Claims</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ for u in users }}
+        <tr>
+          <td><code>{{ u.id | html.escape }}</code></td>
+          <td>{{ u.name | html.escape }}</td>
+          <td>{{ u.email | html.escape }}</td>
+          <td>{{ u.roles | html.escape }}</td>
+          <td>{{ u.claims | html.escape }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </article>
+
+  <footer>
+    <small class="secondary">
+      This is a mock IdP for development and testing. Do not use in production.
+    </small>
+  </footer>
+
+</main>
+
+<script>
+  const baseUrl = `${location.protocol}//${location.host}`;
+
+  const authorizeParams = new URLSearchParams({
+    client_id: "{{ default_client_id | string.escape }}",
+    scope: "{{ default_scope | string.escape }}",
+    response_type: "{{ default_response_type | string.escape }}",
+    redirect_uri: `${baseUrl}/inspect.html`,
+    nonce: "{{ default_nonce | string.escape }}"
+  });
+
+  const authorizeUrl = `/authorize?${authorizeParams.toString()}`;
+  document.getElementById("authorizeLink").href = authorizeUrl;
+  document.getElementById("authorizeUrl").textContent = `${baseUrl}${authorizeUrl}`;
+
+  const tokenUrl = `${baseUrl}/token`;
+  const username = "{{ default_username | string.escape }}";
+
+  const curl = [
+    `curl -X POST "${tokenUrl}" \\`,
+    `  -H "Content-Type: application/x-www-form-urlencoded" \\`,
+    `  --data "grant_type=password&username=${encodeURIComponent(username)}&password=ignore"`
+  ].join("\n");
+
+  document.getElementById("passwordCurl").textContent = curl;
+</script>
+</body>
+</html>
