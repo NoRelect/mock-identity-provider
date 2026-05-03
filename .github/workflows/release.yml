@@ -42,7 +42,7 @@ jobs:
         if: steps.semrel.outputs.version != ''
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ env.OWNER_LC }}/mid
+          images: ghcr.io/${{ env.OWNER_LC }}/mock-identity-provider
           flavor: |
             latest=auto
           tags: |
@@ -50,7 +50,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.semrel.outputs.version }}
             type=semver,pattern={{major}},value=${{ steps.semrel.outputs.version }}
           labels: |
-            org.opencontainers.image.title=mid
+            org.opencontainers.image.title=mock-identity-provider
             org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.url=${{ github.event.repository.html_url }}
             org.opencontainers.image.source=${{ github.event.repository.clone_url }}
