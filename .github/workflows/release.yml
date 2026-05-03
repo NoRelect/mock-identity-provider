@@ -48,7 +48,6 @@ jobs:
         id: meta
         if: steps.semrel.outputs.version != ''
         uses: docker/metadata-action@v6
-        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ env.OWNER_LC }}/mid
           flavor: |
