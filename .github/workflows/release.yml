@@ -30,20 +30,27 @@ jobs:
           echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
         env:
           OWNER: '${{ github.repository_owner }}'
+        uses: actions/checkout@v6
+
+      - name: set lower case owner name
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
 
       - name: Semantic Release
         uses: go-semantic-release/action@v1
         id: semrel
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          allow-initial-development-versions: true
 
       - name: Docker meta
         id: meta
         if: steps.semrel.outputs.version != ''
         uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ env.OWNER_LC }}/mock-identity-provider
+          images: ghcr.io/${{ env.OWNER_LC }}/mid
           flavor: |
             latest=auto
           tags: |
@@ -51,7 +58,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.semrel.outputs.version }}
             type=semver,pattern={{major}},value=${{ steps.semrel.outputs.version }}
           labels: |
-            org.opencontainers.image.title=mock-identity-provider
+            org.opencontainers.image.title=mid
             org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.url=${{ github.event.repository.html_url }}
             org.opencontainers.image.source=${{ github.event.repository.clone_url }}
@@ -72,7 +79,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
 
-      - name: Build and push
+      - name: Build
         if: steps.semrel.outputs.version != ''
         id: docker
         uses: docker/build-push-action@v7

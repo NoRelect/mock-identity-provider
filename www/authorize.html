@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mock IdP</title>
+    <link rel="icon" href="/img/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="/css/style.css" />
+    <script type="text/javascript" src="/js/config.js" defer></script>
+    <script type="text/javascript" src="/js/authorize.js" defer></script>
+</head>
+
+<body>
+    <main class="container">
+        <header>
+            <hgroup>
+                <h1>Mock IdP</h1>
+                <p>
+                    Issuer:
+                    <a href=".well-known/openid-configuration" target="_blank">
+                        <code class="replace-issuer">ISSUER_PLACEHOLDER</code>
+                    </a>
+                </p>
+            </hgroup>
+        </header>
+
+        <h3>Authorize</h3>
+
+        <section id="users"></section>
+
+        <section>
+            <article id="error">
+                <h3>Error</h3>
+                <p>Trigger an error response, simulating login failure</p>
+            </article>
+        </section>
+    </main>
+</body>
+
+</html>

@@ -1,16 +1,14 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-ARG BUILD_CONFIGURATION=Release
-WORKDIR /src
+FROM ghcr.io/rust-cross/rust-musl-cross:${TARGETARCH}-musl AS builder
+COPY Cargo.toml Cargo.lock /home/rust
+COPY src /home/rust/src
+RUN cargo build --release
+RUN BIN_PATH=$(find /home/rust/target -name mock-identity-provider) && \
+    cp ${BIN_PATH} /mock-identity-provider && \
+    musl-strip /mock-identity-provider
 
-COPY . .
-RUN dotnet restore "MockIdentityProvider/MockIdentityProvider.csproj"
-RUN dotnet publish "MockIdentityProvider/MockIdentityProvider.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
-WORKDIR /app
-
-ENV ASPNETCORE_URLS=http://0.0.0.0:8080
-EXPOSE 8080
-
-COPY --from=build /app/publish ./
-ENTRYPOINT ["dotnet", "MockIdentityProvider.dll"]
+FROM scratch
+COPY --from=builder /mock-identity-provider /mock-identity-provider
+COPY www /www
+COPY config.json /config.json
+USER 1000
+ENTRYPOINT [ "/mock-identity-provider" ]

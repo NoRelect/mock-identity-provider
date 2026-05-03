@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mock IdP</title>
+    <link rel="icon" href="/img/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="/css/style.css" />
+    <script type="text/javascript" src="/js/config.js" defer></script>
+    <script type="text/javascript" src="/js/index.js" defer></script>
+</head>
+
+<body>
+    <main class="container">
+        <header>
+            <hgroup>
+                <h1>Mock IdP</h1>
+                <p>
+                    Issuer:
+                    <a href=".well-known/openid-configuration" target="_blank">
+                        <code class="replace-issuer">ISSUER_PLACEHOLDER</code>
+                    </a>
+                </p>
+            </hgroup>
+        </header>
+
+        <section>
+            <h3>Interactive authentication</h3>
+            <a role="button" tabindex="1" id="triggerDemoAuth">Trigger demo authentication</a>
+        </section>
+
+        <section>
+            <h3>CLI authentication</h3>
+            <p>To get an access and ID token from the command line for a specific client, directly call the
+                <code>/token</code> endpoint:
+            </p>
+            <pre class="replace-issuer">curl -X POST ISSUER_PLACEHOLDERtoken \
+    -d "grant_type=password&client_id=demo&username=user"</pre>
+        </section>
+    </main>
+</body>
+
+</html>

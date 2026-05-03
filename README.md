@@ -1,169 +1,38 @@
-# mock-identity-provider
+# Mock Identity Provider
 
-A lightweight **Mock Identity Provider (IdP)** for **OpenID Connect (OIDC)** and **OAuth 2.0**, built on **OpenIddict**.  
-Designed for **local development**, **integration testing** and **automation**, where a real IdP would be overkill.
+This repository contains a simplified implementation of an [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html) identity provider designed for use in development and testing environments where an application implements OpenID Connect Core for authenticating users.
 
----
+> Note: This is NOT intended to be used in production environments!
 
-## Features
+## Quick Start
 
-- OIDC-compliant authorization server
-- Supports multiple OAuth2 flows
-  - Authorization Code
-  - Hybrid
-  - Implicit
-  - Password (Resource Owner Password Credentials)
-  - Refresh Token
-  - None
-- In-memory users defined via configuration
-- Per-user roles and **custom claims**
-- `/authorize`, `/token`, `/user-info`, `/logout`, `/revoke`
-- No persistence, no database
-- No client registration required
-- Suitable for CI pipelines and local testing
+### Docker
 
----
-
-## Configuration
-
-All configuration is done via `appsettings.json`.
-
-### Example `appsettings.json`
-
-```json
-{
-  "Issuer": "http://localhost:6123",
-
-  "AllowAuthorizationCodeFlow": true,
-  "AllowHybridFlow": true,
-  "AllowImplicitFlow": true,
-  "AllowRefreshTokenFlow": true,
-  "AllowPasswordFlow": true,
-  "AllowNoneFlow": true,
-
-  "Users": [
-    {
-      "id": "user",
-      "name": "User",
-      "email": "user@mock.idp",
-      "roles": ["user"]
-    },
-    {
-      "id": "admin",
-      "name": "Admin",
-      "email": "admin@mock.idp",
-      "roles": ["admin"],
-      "claims": {
-        "tenant_id": "t-001",
-        "department": "engineering"
-      }
-    }
-  ]
-}
-````
-
----
-
-## Endpoints
-
-| Endpoint     | Description                                         |
-| ------------ | --------------------------------------------------- |
-| `/authorize` | Authorization endpoint (interactive user selection) |
-| `/token`     | Token endpoint                                      |
-| `/user-info` | UserInfo endpoint                                   |
-| `/logout`    | End session                                         |
-| `/revoke`    | Token revocation                                    |
-
----
-
-## Requesting Tokens (Automation)
-
-### Password Grant (CI / automation)
+Pull and run the docker container (this will deploy the default configuration, as specified in [config.json](config.json)):
 
 ```sh
-curl -X POST http://localhost:6123/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data "grant_type=password&username=admin&password=ignore"
+docker pull ghcr.io/norelect/mock-identity-provider:latest
+docker run --rm -it -p 8000:8000 ghcr.io/norelect/mock-identity-provider:latest
 ```
 
-* `password` is ignored
-* `username` must match a configured user ID
-* No client authentication required
+### Kubernetes
 
----
+Install the helm chart from this repository (this will deploy the default configuration, as specified in [values.yaml](charts/mock-identity-provider/values.yaml)):
 
-### Example Token Response
-
-```json
-{
-  "access_token": "eyJhbGciOi...",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "scope": "profile email role"
-}
+```sh
+helm install mock-identity-provider oci://ghcr.io/norelect/charts/mock-identity-provider \
+    --set issuer=idp.example.com \
+    --set ingress.enabled=true \
+    --set ingress.hosts[0].host=idp.example.com
 ```
 
----
+## Issue tokens
 
-## Authorization Code Flow (Browser)
+To issue tokens from within CI/CD pipelines in tests or from the command line non-interactively, a request to the `/token` endpoint can be created using the `password` grant:
 
-1. Open in browser:
-
-```text
-http://localhost:6123/authorize?response_type=code&client_id=test&scope=profile email role
+```sh
+curl -X POST $ISSUER/token \
+    -d "grant_type=password&client_id=demo&username=user"
 ```
 
-2. Select a user from the UI
-3. Receive authorization code
-4. Exchange code at `/token`
-
----
-
-## Custom Claims
-
-Custom claims are defined per user:
-
-```json
-"claims": {
-  "tenant_id": "t-001",
-  "department": "engineering"
-}
-```
-
-They are:
-
-* Included in **access tokens**
-* Included in **ID tokens**
-* Returned via `/user-info`
-
----
-
-## Security Notes
-
-* No HTTPS enforced (by design)
-* No client validation
-* No token encryption
-* No persistence
-* **Do not use in production**
-
-This project is intended **only** for:
-
-* Local development
-* Automated tests
-* CI/CD pipelines
-
----
-
-## Typical Use Cases
-
-* Frontend development without a real IdP
-* Backend integration tests
-* OAuth/OIDC client testing
-* Mocking Entra ID / Keycloak / Auth0 behavior
-
----
-
-## License
-
-GNU General Public License v3.0
-
+The endpoint intentionally doesn't require a password and directly issues the tokens if the user exists within the configuration.
