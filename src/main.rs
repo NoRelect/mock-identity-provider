@@ -3,6 +3,7 @@ use std::ops::Add;
 use std::sync::Arc;
 
 use axum::extract::State;
+use axum::http::{HeaderValue, Method, request::Parts as RequestParts};
 use axum::response::{IntoResponse, Response};
 use axum::{Form, Json, Router, routing::get, routing::post};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
@@ -25,6 +26,7 @@ use rsa::pkcs1::EncodeRsaPrivateKey;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::signal;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{error, info};
 
@@ -104,6 +106,13 @@ async fn main() {
 
     let serve_dir = ServeDir::new("www").not_found_service(ServeFile::new("www/index.html"));
 
+    let cors = CorsLayer::new()
+        .allow_credentials(true)
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(AllowOrigin::predicate(
+            | _: &HeaderValue, _: &RequestParts | true
+        ));
+
     let app = Router::new()
         .route(
             "/.well-known/openid-configuration",
@@ -113,6 +122,7 @@ async fn main() {
         .route("/js/config.js", get(handle_configjs_request))
         .route("/token", post(handle_token_request))
         .with_state(state)
+        .layer(cors)
         .fallback_service(serve_dir);
 
     let listener = tokio::net::TcpListener::bind("[::]:8000").await.unwrap();
