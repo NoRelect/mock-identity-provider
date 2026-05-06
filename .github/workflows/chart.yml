@@ -1,0 +1,29 @@
+---
+name: Chart
+
+on:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - v**
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - id: version
+        run: echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - uses: appany/helm-oci-chart-releaser@v0.5.0
+        with:
+          name: mock-identity-provider
+          repository: norelect/charts
+          tag: ${{ steps.version.outputs.tag }}
+          app_version: ${{ steps.version.outputs.tag }}
+          path: charts/mock-identity-provider
+          registry: ghcr.io
+          registry_username: ${{ github.repository_owner }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
