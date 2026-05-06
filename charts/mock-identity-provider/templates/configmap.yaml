@@ -5,4 +5,4 @@ metadata:
   labels:
     {{- include "mock-identity-provider.labels" . | nindent 4 }}
 data:
-  config.json: {{ .Values.config | toJson }}
+  config.json: {{ .Values.config | toJson | quote }}
