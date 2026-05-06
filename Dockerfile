@@ -1,10 +1,10 @@
-FROM rust:1.95 AS builder
-WORKDIR /code
-COPY Cargo.toml Cargo.lock /code/
-COPY src /code/src
+FROM ghcr.io/rust-cross/rust-musl-cross:${TARGETARCH}-musl AS builder
+COPY Cargo.toml Cargo.lock /home/rust
+COPY src /home/rust/src
 RUN cargo build --release
-RUN BIN_PATH=$(find /code -name mock-identity-provider) && \
-    cp ${BIN_PATH} /mock-identity-provider
+RUN BIN_PATH=$(find /home/rust/target -name mock-identity-provider) && \
+    cp ${BIN_PATH} /mock-identity-provider && \
+    musl-strip /mock-identity-provider
 
 FROM scratch
 COPY --from=builder /mock-identity-provider /mock-identity-provider
