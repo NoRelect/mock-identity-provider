@@ -140,7 +140,7 @@ fn get_core_provider_metadata(state: AppState) -> CoreProviderMetadata {
 
     let provider_metadata = CoreProviderMetadata::new(
         IssuerUrl::new(issuer.clone()).unwrap(),
-        AuthUrl::new(format!("{}authorize", issuer)).unwrap(),
+        AuthUrl::new(format!("{}authorize.html", issuer)).unwrap(),
         JsonWebKeySetUrl::new(format!("{}.well-known/jwks.json", issuer)).unwrap(),
         vec![
             ResponseTypes::new(vec![CoreResponseType::Code]),
