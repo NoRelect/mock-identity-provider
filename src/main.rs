@@ -21,6 +21,8 @@ use openidconnect::{
     ResponseTypes, Scope, StandardClaims, StandardErrorResponse, StandardTokenResponse,
     SubjectIdentifier, TokenUrl,
 };
+use opentelemetry::global;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use rsa::RsaPrivateKey;
 use rsa::pkcs1::EncodeRsaPrivateKey;
 use serde::{Deserialize, Serialize};
@@ -29,6 +31,7 @@ use tokio::signal;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{error, info};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Config {
@@ -70,9 +73,39 @@ impl AppState {
     }
 }
 
+fn init_tracer_provider() -> SdkTracerProvider {
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .build()
+        .expect("Failed to build OTLP span exporter");
+
+    let service_name = std::env::var("OTEL_SERVICE_NAME")
+        .unwrap_or_else(|_| "mock_identity_provider".to_string());
+
+    let resource = opentelemetry_sdk::Resource::builder()
+        .with_service_name(service_name)
+        .build();
+
+    SdkTracerProvider::builder()
+        .with_resource(resource)
+        .with_batch_exporter(exporter)
+        .build()
+}
+
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().init();
+    let tracer_provider = init_tracer_provider();
+    global::set_tracer_provider(tracer_provider.clone());
+    let tracer = global::tracer("mock-identity-provider");
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .init();
 
     let config_json =
         std::fs::read_to_string("config.json").expect("Unable to read config.json contents");
@@ -110,7 +143,7 @@ async fn main() {
         .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(AllowOrigin::predicate(
-            | _: &HeaderValue, _: &RequestParts | true
+            |_: &HeaderValue, _: &RequestParts| true,
         ));
 
     let app = Router::new()
@@ -122,6 +155,8 @@ async fn main() {
         .route("/js/config.js", get(handle_configjs_request))
         .route("/token", post(handle_token_request))
         .with_state(state)
+        .layer(axum_tracing_opentelemetry::middleware::OtelInResponseLayer::default())
+        .layer(axum_tracing_opentelemetry::middleware::OtelAxumLayer::default())
         .layer(cors)
         .fallback_service(serve_dir);
 
@@ -133,6 +168,10 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
+
+    tracer_provider
+        .shutdown()
+        .expect("Failed to shut down tracer provider");
 }
 
 fn get_core_provider_metadata(state: AppState) -> CoreProviderMetadata {
