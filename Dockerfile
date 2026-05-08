@@ -12,6 +12,7 @@ COPY config.json /config.json
 COPY --from=builder /mock-identity-provider /mock-identity-provider
 
 FROM scratch
+ENV RUST_LOG=info
 COPY --from=intermediate / /
 USER 1000
 ENTRYPOINT [ "/mock-identity-provider" ]
