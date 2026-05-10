@@ -15,7 +15,7 @@ openidconnect = { version = "4.0.1", features = [
 ], default-features = false }
 opentelemetry = { version = "0.31" }
 opentelemetry_sdk = { version = "0.31" }
-opentelemetry-otlp = { version = "0.31", default-features = false, features = [
+opentelemetry-otlp = { version = "0.32", default-features = false, features = [
     "http-proto",
     "trace",
     "reqwest-blocking-client",
