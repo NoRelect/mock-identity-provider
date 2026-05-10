@@ -1,0 +1,24 @@
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/rust:2-1-trixie
+    volumes:
+      - ..:/workspace:cached
+    environment:
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=1
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+    networks:
+      - devcontainer
+    command: sleep infinity
+
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.17.0
+    ports:
+      - "16686:16686"
+    networks:
+      - devcontainer
+
+networks:
+  devcontainer:
+    driver: bridge
