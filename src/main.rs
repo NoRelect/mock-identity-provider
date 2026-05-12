@@ -30,7 +30,7 @@ use serde_json::Value;
 use tokio::signal;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -92,8 +92,8 @@ fn init_tracer_provider() -> SdkTracerProvider {
         .build()
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    // Initialize tracing before sandboxing so we can log from apply_sandbox.
     let tracer_provider = init_tracer_provider();
     global::set_tracer_provider(tracer_provider.clone());
     let tracer = global::tracer("mock-identity-provider");
@@ -107,6 +107,7 @@ async fn main() {
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .init();
 
+    // Read config before sandboxing; all other file I/O happens at runtime under the sandbox.
     let config_json =
         std::fs::read_to_string("config.json").expect("Unable to read config.json contents");
     let mut config: Config =
@@ -117,6 +118,54 @@ async fn main() {
     }
 
     info!("Loaded configuration");
+
+    // Apply landlock before creating the tokio runtime so all worker threads inherit
+    // the restrictions via Linux's thread-descendant inheritance model.
+    apply_sandbox();
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to build Tokio runtime")
+        .block_on(run(config, tracer_provider));
+}
+
+fn apply_sandbox() {
+    use landlock::{
+        ABI, Access, AccessFs, PathBeneath, PathFd, Ruleset, RulesetAttr, RulesetCreatedAttr,
+    };
+
+    let abi = ABI::V6;
+
+    let www_fd = match PathFd::new("www") {
+        Ok(fd) => fd,
+        Err(e) => {
+            warn!("Landlock sandbox not applied: cannot open www/ ({e})");
+            return;
+        }
+    };
+
+    // Restrict all filesystem access, then whitelist only what the server needs at runtime:
+    let result = (|| -> Result<_, landlock::RulesetError> {
+        Ruleset::default()
+            .handle_access(AccessFs::from_all(abi))?
+            .create()?
+            .add_rules([
+                Ok::<_, landlock::RulesetError>(PathBeneath::new(
+                    www_fd,
+                    AccessFs::from_read(abi),
+                )),
+            ])?
+            .restrict_self()
+    })();
+
+    match result {
+        Ok(status) => info!("Landlock sandbox applied ({:?})", status.ruleset),
+        Err(e) => warn!("Landlock not enforced: {e}"),
+    }
+}
+
+async fn run(config: Config, tracer_provider: SdkTracerProvider) {
     info!("Generating RSA key, this may take some time...");
 
     let mut rng = rsa::rand_core::OsRng;
