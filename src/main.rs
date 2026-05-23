@@ -79,8 +79,8 @@ fn init_tracer_provider() -> SdkTracerProvider {
         .build()
         .expect("Failed to build OTLP span exporter");
 
-    let service_name = std::env::var("OTEL_SERVICE_NAME")
-        .unwrap_or_else(|_| "mock_identity_provider".to_string());
+    let service_name =
+        std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "mock_identity_provider".to_string());
 
     let resource = opentelemetry_sdk::Resource::builder()
         .with_service_name(service_name)
@@ -316,11 +316,11 @@ async fn handle_token_request(
     State(state): State<AppState>,
     Form(request): Form<TokenRequest>,
 ) -> Response {
-    let Some(client_id) = request.client_id else {
-        return Json(error_response("client_id is missing")).into_response();
-    };
-
     if request.grant_type == CoreGrantType::Password {
+        let Some(client_id) = request.client_id else {
+            return Json(error_response("client_id is missing")).into_response();
+        };
+
         let Some(username) = request.username else {
             return Json(error_response("username is missing")).into_response();
         };
@@ -333,6 +333,10 @@ async fn handle_token_request(
     }
 
     if request.grant_type == CoreGrantType::ClientCredentials {
+        let Some(client_id) = request.client_id else {
+            return Json(error_response("client_id is missing")).into_response();
+        };
+
         let Some(user) = get_user_by_name(&state, client_id.clone()) else {
             return Json(error_response("user not found")).into_response();
         };
@@ -354,7 +358,10 @@ async fn handle_token_request(
             return Json(error_response("refresh_token is invalid")).into_response();
         };
 
-        if token.aud != client_id {
+        if request
+            .client_id
+            .is_some_and(|client_id| token.aud != client_id)
+        {
             return Json(error_response(
                 "refresh_token is not valid for this client_id",
             ))
@@ -392,7 +399,10 @@ async fn handle_token_request(
             return Json(error_response("code is invalid")).into_response();
         };
 
-        if token.aud != client_id {
+        if request
+            .client_id
+            .is_some_and(|client_id| token.aud != client_id)
+        {
             return Json(error_response("code is not valid for this client_id")).into_response();
         }
 
