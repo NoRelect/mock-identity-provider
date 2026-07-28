@@ -8,7 +8,7 @@ axum = { version = "0.8.9" }
 axum-tracing-opentelemetry = { version = "0.38", features = [
     "tracing_level_info",
 ] }
-base64 = { version = "0.22.1" }
+base64 = { version = "0.23.0" }
 chrono = { version = "0.4.45" }
 openidconnect = { version = "4.0.1", features = [
     "rustls-tls",
