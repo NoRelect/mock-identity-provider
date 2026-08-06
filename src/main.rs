@@ -1,682 +1,77 @@
-use std::collections::HashMap;
-use std::ops::Add;
-use std::sync::Arc;
-
-use axum::extract::State;
-use axum::http::{HeaderValue, Method, request::Parts as RequestParts};
-use axum::response::{IntoResponse, Response};
-use axum::{Form, Json, Router, routing::get, routing::post};
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
-use chrono::{DateTime, TimeDelta, Utc};
-use openidconnect::core::{
-    CoreClaimName, CoreEdDsaPrivateSigningKey, CoreErrorResponseType, CoreGenderClaim,
-    CoreGrantType, CoreJsonWebKey, CoreJsonWebKeySet, CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType, CoreRsaPrivateSigningKey,
-    CoreSubjectIdentifierType, CoreTokenType,
-};
-use openidconnect::{
-    AccessToken, AdditionalClaims, Audience, AuthUrl, AuthorizationCodeHash,
-    EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, IdToken, IdTokenClaims, IdTokenFields,
-    IssuerUrl, JsonWebKeyId, JsonWebKeySetUrl, Nonce, PrivateSigningKey, RefreshToken,
-    ResponseTypes, Scope, StandardClaims, StandardErrorResponse, StandardTokenResponse,
-    SubjectIdentifier, TokenUrl,
-};
-use opentelemetry::global;
-use opentelemetry_sdk::trace::SdkTracerProvider;
-use rsa::RsaPrivateKey;
-use rsa::pkcs1::EncodeRsaPrivateKey;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use tokio::signal;
+use axum::routing::{get, post};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{error, info, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing::info;
 
-#[derive(Serialize, Deserialize, Clone)]
-struct Config {
-    #[serde(default)]
-    key_size: usize,
-    #[serde(default = "default_algorithm")]
-    algorithm: String,
-    #[serde(default)]
-    users: Vec<User>,
-    issuer: String,
-}
-
-fn default_algorithm() -> String {
-    "RSA".to_string()
-}
-
-#[derive(Clone)]
-enum SigningKeyPair {
-    Rsa {
-        private_key: Arc<CoreRsaPrivateSigningKey>,
-        public_key: CoreJsonWebKey,
-    },
-    Ed25519 {
-        private_key: Arc<CoreEdDsaPrivateSigningKey>,
-        public_key: CoreJsonWebKey,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct User {
-    sub: String,
-    claims: HashMap<String, Value>,
-}
-
-#[derive(Clone)]
-struct AppState {
-    pub config: Config,
-    pub key_pair: SigningKeyPair,
-    pub access_token_lifetime: TimeDelta,
-    pub refresh_token_lifetime: TimeDelta,
-    pub authorization_code_lifetime: TimeDelta,
-}
-
-impl AppState {
-    pub fn new(config: Config, key_pair: SigningKeyPair) -> AppState {
-        return AppState {
-            config,
-            key_pair,
-            access_token_lifetime: TimeDelta::minutes(5),
-            refresh_token_lifetime: TimeDelta::hours(1),
-            authorization_code_lifetime: TimeDelta::minutes(1),
-        };
-    }
-}
-
-fn init_tracer_provider() -> SdkTracerProvider {
-    let exporter = opentelemetry_otlp::SpanExporter::builder()
-        .with_http()
-        .build()
-        .expect("Failed to build OTLP span exporter");
-
-    let service_name =
-        std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "mock_identity_provider".to_string());
-
-    let resource = opentelemetry_sdk::Resource::builder()
-        .with_service_name(service_name)
-        .build();
-
-    SdkTracerProvider::builder()
-        .with_resource(resource)
-        .with_batch_exporter(exporter)
-        .build()
-}
+mod config;
+mod infra;
+mod keys;
+mod openid;
+mod tokens;
 
 fn main() {
-    // Initialize tracing before sandboxing so we can log from apply_sandbox.
-    let tracer_provider = init_tracer_provider();
-    global::set_tracer_provider(tracer_provider.clone());
-    let tracer = global::tracer("mock-identity-provider");
+    let tracer_provider = infra::init_tracer_provider();
 
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
-
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(tracing_subscriber::fmt::layer())
-        .with(tracing_opentelemetry::layer().with_tracer(tracer))
-        .init();
-
-    // Read config before sandboxing; all other file I/O happens at runtime under the sandbox.
     let config_json =
         std::fs::read_to_string("config.json").expect("Unable to read config.json contents");
-    let mut config: Config =
+    let mut config: config::Config =
         serde_json::from_str(&config_json).expect("Invalid configuration json");
 
     if !config.issuer.ends_with('/') {
         config.issuer.push('/');
     }
 
+    // Initialize tracing before sandboxing so we can log from apply_sandbox.
+    infra::setup_tracing(&tracer_provider);
+
     info!("Loaded configuration");
+
+    // Read the signing key before sandboxing (key gen happens outside the sandbox).
+    let key_pair = keys::generate_keys(&config);
 
     // Apply landlock before creating the tokio runtime so all worker threads inherit
     // the restrictions via Linux's thread-descendant inheritance model.
-    apply_sandbox();
+    infra::apply_sandbox();
 
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to build Tokio runtime")
-        .block_on(run(config, tracer_provider));
-}
-
-fn apply_sandbox() {
-    use landlock::{
-        ABI, Access, AccessFs, PathBeneath, PathFd, Ruleset, RulesetAttr, RulesetCreatedAttr,
-    };
-
-    let abi = ABI::V6;
-
-    let www_fd = match PathFd::new("www") {
-        Ok(fd) => fd,
-        Err(e) => {
-            warn!("Landlock sandbox not applied: cannot open www/ ({e})");
-            return;
-        }
-    };
-
-    // Restrict all filesystem access, then whitelist only what the server needs at runtime:
-    let result = (|| -> Result<_, landlock::RulesetError> {
-        Ruleset::default()
-            .handle_access(AccessFs::from_all(abi))?
-            .create()?
-            .add_rules([Ok::<_, landlock::RulesetError>(PathBeneath::new(
-                www_fd,
-                AccessFs::from_read(abi),
-            ))])?
-            .restrict_self()
-    })();
-
-    match result {
-        Ok(status) => info!("Landlock sandbox applied ({:?})", status.ruleset),
-        Err(e) => warn!("Landlock not enforced: {e}"),
-    }
-}
-
-async fn run(config: Config, tracer_provider: SdkTracerProvider) {
-    let key_pair = if config.algorithm == "EdDSA" {
-        info!("Generating Ed25519 key");
-
-        let seed: [u8; 32] = {
-            let mut rng = rsa::rand_core::OsRng;
-            let mut s = [0u8; 32];
-            use rsa::rand_core::RngCore;
-            rng.fill_bytes(&mut s);
-            s
-        };
-
-        use pkcs8::{EncodePrivateKey, LineEnding};
-        let sign_key = ed25519_dalek::SigningKey::from_bytes(&seed);
-        let pem = sign_key.to_pkcs8_pem(LineEnding::CRLF).expect("PKCS#8 PEM");
-
-        let private_key = Arc::new(
-            CoreEdDsaPrivateSigningKey::from_ed25519_pem(
-                &pem,
-                Some(JsonWebKeyId::new("ed25519-key".to_string())),
-            )
-            .expect("Failed to create Ed25519 signing key"),
-        );
-        let public_key = private_key.as_verification_key();
-
-        SigningKeyPair::Ed25519 {
-            private_key,
-            public_key,
-        }
-    } else {
-        info!("Generating RSA key, this may take some time...");
-
-        let key_size = if config.key_size > 0 {
-            config.key_size
-        } else {
-            info!("No key_size specified, defaulting to 4096");
-            4096
-        };
-
-        let mut rng = rsa::rand_core::OsRng;
-        let rsa_priv_key =
-            RsaPrivateKey::new(&mut rng, key_size).expect("Failed to generate a key");
-        let rsa_pem = rsa_priv_key
-            .to_pkcs1_pem(rsa::pkcs8::LineEnding::CRLF)
-            .expect("Failed to convert private key to PEM");
-
-        info!("Generated RSA key");
-
-        let rsa_private_key = CoreRsaPrivateSigningKey::from_pem(
-            &rsa_pem,
-            Some(JsonWebKeyId::new("rsa-key".to_string())),
-        )
-        .unwrap();
-        let rsa_public_key = rsa_private_key.as_verification_key().clone();
-
-        SigningKeyPair::Rsa {
-            private_key: Arc::new(rsa_private_key),
-            public_key: rsa_public_key,
-        }
-    };
-
-    let state = AppState::new(config, key_pair);
+    let state = config::AppState::new(config, key_pair);
 
     let serve_dir = ServeDir::new("www").not_found_service(ServeFile::new("www/index.html"));
 
     let cors = CorsLayer::new()
         .allow_credentials(true)
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
         .allow_origin(AllowOrigin::predicate(
-            |_: &HeaderValue, _: &RequestParts| true,
+            |_headers: &axum::http::HeaderValue, _parts: &axum::http::request::Parts| true,
         ));
 
-    let app = Router::new()
+    let app = axum::Router::new()
         .route(
             "/.well-known/openid-configuration",
-            get(get_provider_metadata),
+            get(openid::get_provider_metadata_route),
         )
-        .route("/.well-known/jwks.json", get(get_jwks))
-        .route("/js/config.js", get(handle_configjs_request))
-        .route("/token", post(handle_token_request))
+        .route("/.well-known/jwks.json", get(openid::get_jwks_route))
+        .route("/js/config.js", get(tokens::handle_configjs_route))
+        .route("/token", post(tokens::handle_token_route))
         .with_state(state)
         .layer(axum_tracing_opentelemetry::middleware::OtelInResponseLayer::default())
         .layer(axum_tracing_opentelemetry::middleware::OtelAxumLayer::default())
         .layer(cors)
         .fallback_service(serve_dir);
 
-    let listener = tokio::net::TcpListener::bind("[::]:8000").await.unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to build Tokio runtime");
 
-    info!("Created listener");
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .unwrap();
-
-    tracer_provider
-        .shutdown()
-        .expect("Failed to shut down tracer provider");
-}
-
-fn get_core_provider_metadata(state: &AppState) -> CoreProviderMetadata {
-    let issuer = state.config.issuer.clone();
-
-    let signing_algos: Vec<CoreJwsSigningAlgorithm> = if state.config.algorithm == "EdDSA" {
-        vec![CoreJwsSigningAlgorithm::EdDsa]
-    } else {
-        vec![CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256]
-    };
-
-    let provider_metadata = CoreProviderMetadata::new(
-        IssuerUrl::new(issuer.clone()).unwrap(),
-        AuthUrl::new(format!("{}authorize.html", issuer)).unwrap(),
-        JsonWebKeySetUrl::new(format!("{}.well-known/jwks.json", issuer)).unwrap(),
-        vec![
-            ResponseTypes::new(vec![CoreResponseType::Code]),
-            ResponseTypes::new(vec![CoreResponseType::IdToken, CoreResponseType::Token]),
-            ResponseTypes::new(vec![CoreResponseType::Token]),
-        ],
-        vec![CoreSubjectIdentifierType::Public],
-        signing_algos,
-        EmptyAdditionalProviderMetadata {},
-    )
-    .set_token_endpoint(Some(TokenUrl::new(format!("{}token", issuer)).unwrap()))
-    .set_scopes_supported(Some(vec![Scope::new("openid".to_string())]))
-    .set_grant_types_supported(Some(vec![
-        CoreGrantType::Password,
-        CoreGrantType::RefreshToken,
-        CoreGrantType::AuthorizationCode,
-        CoreGrantType::ClientCredentials,
-        CoreGrantType::Implicit,
-    ]))
-    .set_claims_supported(Some(vec![
-        CoreClaimName::new("sub".to_string()),
-        CoreClaimName::new("aud".to_string()),
-        CoreClaimName::new("exp".to_string()),
-        CoreClaimName::new("iat".to_string()),
-        CoreClaimName::new("iss".to_string()),
-    ]));
-    return provider_metadata;
-}
-
-async fn get_provider_metadata(State(state): State<AppState>) -> Json<CoreProviderMetadata> {
-    return Json(get_core_provider_metadata(&state));
-}
-
-async fn get_jwks(State(state): State<AppState>) -> Json<CoreJsonWebKeySet> {
-    let public_key = match &state.key_pair {
-        SigningKeyPair::Rsa { public_key, .. } => public_key.clone(),
-        SigningKeyPair::Ed25519 { public_key, .. } => public_key.clone(),
-    };
-    let jwks = CoreJsonWebKeySet::new(vec![public_key]);
-    return Json(jwks);
-}
-
-async fn handle_configjs_request(State(state): State<AppState>) -> Response {
-    let app_config = serde_json::to_string(&state.config).unwrap();
-    let openid_config = serde_json::to_string(&get_core_provider_metadata(&state)).unwrap();
-    let js_body = format!(
-        "const APP_CONFIG = {};\nconst OPENID_CONFIG = {};",
-        app_config, openid_config
-    );
-    return (
-        [
-            ("content-type", "text/javascript"),
-            ("cache-control", "no-store"),
-        ],
-        js_body,
-    )
-        .into_response();
-}
-
-#[derive(Deserialize)]
-struct TokenRequest {
-    grant_type: CoreGrantType,
-    code: Option<String>,
-    client_id: Option<String>,
-    refresh_token: Option<String>,
-    username: Option<String>,
-    scope: Option<String>,
-    nonce: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct MidToken {
-    aud: String,
-    sub: String,
-    scp: Option<String>,
-    nonce: Option<String>,
-    code_hash: Option<String>,
-    iat: DateTime<Utc>,
-}
-
-fn get_user_by_name(state: &AppState, name: String) -> Option<User> {
-    let Some(user) = state.config.users.iter().find(|u| u.sub == name) else {
-        return None;
-    };
-    return Some(user.clone());
-}
-
-async fn handle_token_request(
-    State(state): State<AppState>,
-    Form(request): Form<TokenRequest>,
-) -> Response {
-    if request.grant_type == CoreGrantType::Password {
-        let Some(client_id) = request.client_id else {
-            return Json(error_response("client_id is missing")).into_response();
-        };
-
-        let Some(username) = request.username else {
-            return Json(error_response("username is missing")).into_response();
-        };
-
-        let Some(user) = get_user_by_name(&state, username) else {
-            return Json(error_response("user not found")).into_response();
-        };
-
-        return create_token_response(state, client_id, &user, request.scope, request.nonce, None);
-    }
-
-    if request.grant_type == CoreGrantType::ClientCredentials {
-        let Some(client_id) = request.client_id else {
-            return Json(error_response("client_id is missing")).into_response();
-        };
-
-        let Some(user) = get_user_by_name(&state, client_id.clone()) else {
-            return Json(error_response("user not found")).into_response();
-        };
-
-        return create_token_response(state, client_id, &user, request.scope, request.nonce, None);
-    }
-
-    if request.grant_type == CoreGrantType::RefreshToken {
-        let Some(refresh_token) = request.refresh_token else {
-            return Json(error_response("refresh_token is missing")).into_response();
-        };
-
-        let Ok(refresh_token) = URL_SAFE.decode(refresh_token) else {
-            return Json(error_response("refresh_token is not valid base64 url data"))
-                .into_response();
-        };
-
-        let Ok(token) = serde_json::from_slice::<MidToken>(&refresh_token) else {
-            return Json(error_response("refresh_token is invalid")).into_response();
-        };
-
-        if request
-            .client_id
-            .is_some_and(|client_id| token.aud != client_id)
-        {
-            return Json(error_response(
-                "refresh_token is not valid for this client_id",
-            ))
-            .into_response();
-        }
-
-        if token.iat.add(state.refresh_token_lifetime) <= Utc::now() {
-            return Json(error_response("refresh_token has expired")).into_response();
-        }
-
-        let Some(user) = get_user_by_name(&state, token.sub) else {
-            return Json(error_response("user not found")).into_response();
-        };
-
-        return create_token_response(
-            state,
-            token.aud,
-            &user,
-            token.scp,
-            token.nonce,
-            token.code_hash,
-        );
-    }
-
-    if request.grant_type == CoreGrantType::AuthorizationCode {
-        let Some(code) = request.code else {
-            return Json(error_response("code is missing")).into_response();
-        };
-
-        let Ok(authorization_code) = URL_SAFE.decode(code.clone()) else {
-            return Json(error_response("code is not valid base64 url data")).into_response();
-        };
-
-        let Ok(token) = serde_json::from_slice::<MidToken>(&authorization_code) else {
-            return Json(error_response("code is invalid")).into_response();
-        };
-
-        if request
-            .client_id
-            .is_some_and(|client_id| token.aud != client_id)
-        {
-            return Json(error_response("code is not valid for this client_id")).into_response();
-        }
-
-        if token.iat.add(state.authorization_code_lifetime) <= Utc::now() {
-            return Json(error_response("code has expired")).into_response();
-        }
-
-        let Some(user) = get_user_by_name(&state, token.sub) else {
-            return Json(error_response("user not found")).into_response();
-        };
-
-        return create_token_response(state, token.aud, &user, token.scp, token.nonce, Some(code));
-    }
-
-    return Json(StandardErrorResponse::new(
-        CoreErrorResponseType::InvalidGrant,
-        None,
-        None,
-    ))
-    .into_response();
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct DynamicAdditionalClaims(HashMap<String, Value>);
-impl AdditionalClaims for DynamicAdditionalClaims {}
-
-fn create_token_response(
-    state: AppState,
-    client_id: String,
-    user: &User,
-    scope: Option<String>,
-    nonce: Option<String>,
-    code: Option<String>,
-) -> Response {
-    let issue_time = Utc::now();
-    let expiration_time = issue_time.add(state.access_token_lifetime);
-    let standard_claims: StandardClaims<CoreGenderClaim> =
-        StandardClaims::new(SubjectIdentifier::new(user.sub.clone()));
-    let access_token_claims = IdTokenClaims::new(
-        IssuerUrl::new(state.config.issuer.clone()).unwrap(),
-        vec![Audience::new(client_id.clone())],
-        expiration_time,
-        issue_time,
-        standard_claims,
-        DynamicAdditionalClaims(user.claims.clone()),
-    );
-
-    let mut id_token_claims = access_token_claims.clone();
-
-    let (access_token_bearer, id_token, authorization_code_hash) = match state.key_pair {
-        SigningKeyPair::Rsa {
-            private_key,
-            public_key,
-        } => {
-            let alg = CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256;
-            let access_token_inner: openidconnect::IdToken<
-                _,
-                _,
-                CoreJweContentEncryptionAlgorithm,
-                _,
-            > = IdToken::new(
-                access_token_claims.clone(),
-                private_key.as_ref(),
-                alg.clone(),
-                None,
-                None,
-            )
-            .unwrap();
-            let access_token_bearer_temp = AccessToken::new(access_token_inner.to_string());
-
-            if let Some(nonce) = nonce.clone() {
-                id_token_claims = id_token_claims.set_nonce(Some(Nonce::new(nonce)));
-            }
-
-            let auth_code_hash = match &code {
-                Some(code) => {
-                    let hash_result = AuthorizationCodeHash::from_code(
-                        &openidconnect::AuthorizationCode::new(code.as_str().to_string()),
-                        &alg,
-                        &public_key,
-                    );
-                    Some(hash_result.unwrap())
-                }
-                None => None,
-            };
-
-            id_token_claims = id_token_claims.set_code_hash(auth_code_hash.clone());
-
-            let id_token_inner: IdToken<
-                DynamicAdditionalClaims,
-                CoreGenderClaim,
-                CoreJweContentEncryptionAlgorithm,
-                CoreJwsSigningAlgorithm,
-            > = IdToken::new(
-                id_token_claims,
-                private_key.as_ref(),
-                alg,
-                Some(&access_token_bearer_temp),
-                None,
-            )
-            .unwrap();
-
-            (access_token_bearer_temp, id_token_inner, auth_code_hash)
-        }
-        SigningKeyPair::Ed25519 {
-            private_key,
-            public_key,
-        } => {
-            let alg = CoreJwsSigningAlgorithm::EdDsa;
-            let access_token_inner: openidconnect::IdToken<
-                _,
-                _,
-                CoreJweContentEncryptionAlgorithm,
-                _,
-            > = IdToken::new(
-                access_token_claims.clone(),
-                private_key.as_ref(),
-                alg.clone(),
-                None,
-                None,
-            )
-            .unwrap();
-            let access_token_bearer_temp = AccessToken::new(access_token_inner.to_string());
-
-            if let Some(nonce) = nonce.clone() {
-                id_token_claims = id_token_claims.set_nonce(Some(Nonce::new(nonce)));
-            }
-
-            let auth_code_hash = match &code {
-                Some(code) => {
-                    let hash_result = AuthorizationCodeHash::from_code(
-                        &openidconnect::AuthorizationCode::new(code.as_str().to_string()),
-                        &alg,
-                        &public_key,
-                    );
-                    Some(hash_result.unwrap())
-                }
-                None => None,
-            };
-
-            id_token_claims = id_token_claims.set_code_hash(auth_code_hash.clone());
-
-            let id_token_inner: IdToken<
-                DynamicAdditionalClaims,
-                CoreGenderClaim,
-                CoreJweContentEncryptionAlgorithm,
-                CoreJwsSigningAlgorithm,
-            > = IdToken::new(
-                id_token_claims,
-                private_key.as_ref(),
-                alg,
-                Some(&access_token_bearer_temp),
-                None,
-            )
-            .unwrap();
-
-            (access_token_bearer_temp, id_token_inner, auth_code_hash)
-        }
-    };
-
-    let mut token_response = StandardTokenResponse::new(
-        access_token_bearer,
-        CoreTokenType::Bearer,
-        IdTokenFields::new(Some(id_token), EmptyExtraTokenFields {}),
-    );
-    let refresh_token = MidToken {
-        aud: client_id,
-        sub: user.sub.clone(),
-        scp: scope,
-        nonce: nonce,
-        code_hash: match authorization_code_hash {
-            Some(code_hash) => Some(code_hash.to_string()),
-            None => None,
-        },
-        iat: issue_time,
-    };
-    token_response.set_refresh_token(Some(RefreshToken::new(
-        URL_SAFE.encode(serde_json::to_vec(&refresh_token).unwrap()),
-    )));
-
-    info!("Issued tokens for user '{}'", user.sub);
-
-    return Json(token_response).into_response();
-}
-
-fn error_response(message: &str) -> StandardErrorResponse<CoreErrorResponseType> {
-    error!("Returned error response: {}", message);
-    return StandardErrorResponse::new(
-        CoreErrorResponseType::InvalidRequest,
-        Some(message.to_string()),
-        None,
-    );
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
+    runtime.block_on(async {
+        info!("Created listener");
+        let listener = tokio::net::TcpListener::bind("[::]:8000").await.unwrap();
+        axum::serve(listener, app)
+            .with_graceful_shutdown(infra::shutdown_signal())
             .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
+            .unwrap();
+        tracer_provider
+            .shutdown()
+            .expect("Failed to shut down tracer provider");
+    });
 }
