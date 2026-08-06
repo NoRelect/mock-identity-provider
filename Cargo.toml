@@ -4,18 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = { version = "0.8.9", default-features = false, features = ["form", "http1", "json", "tokio"] }
-axum-tracing-opentelemetry = { version = "0.33", features = [
+axum = { version = "0.8.9" }
+axum-tracing-opentelemetry = { version = "0.38", features = [
     "tracing_level_info",
 ] }
-base64 = { version = "0.22.1", default-features = false }
-chrono = { version = "0.4.44", default-features = false, features = ["clock", "std"] }
+base64 = { version = "0.23.0" }
+chrono = { version = "0.4.45" }
 ed25519-dalek = { version = "2.2" }
 openidconnect = { version = "4.0.1", features = [
     "rustls-tls",
 ], default-features = false }
-opentelemetry = { version = "0.32", default-features = false, features = ["trace"] }
-opentelemetry_sdk = { version = "0.32", default-features = false, features = ["trace"] }
+opentelemetry = { version = "0.32" }
+opentelemetry_sdk = { version = "0.32" }
 opentelemetry-otlp = { version = "0.32", default-features = false, features = [
     "http-proto",
     "trace",
@@ -23,12 +23,12 @@ opentelemetry-otlp = { version = "0.32", default-features = false, features = [
     "reqwest-rustls-webpki-roots",
 ] }
 pkcs8 = { version = "0.10", features = ["pem"] }
-rsa = { version = "0.9.10", default-features = false, features = ["pem", "std"] }
-serde = { version = "1.0.228", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.150", default-features = false, features = ["alloc"] }
-tokio = { version = "1.52.3", default-features = false, features = ["rt-multi-thread", "signal"] }
-tower-http = { version = "0.6.11", default-features = false, features = ["cors", "fs"] }
+rsa = { version = "0.9.10" }
+serde = { version = "1.0.228" }
+serde_json = { version = "1.0.150" }
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "signal"] }
+tower-http = { version = "0.7.0", features = ["full"] }
 tracing = { version = "0.1.44" }
-tracing-opentelemetry = { version = "0.33", default-features = false }
-tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter"] }
+tracing-opentelemetry = { version = "0.33" }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 landlock = { version = "0.4.5" }
