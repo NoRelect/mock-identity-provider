@@ -1,6 +1,7 @@
 {
   "issuer": "http://localhost:8000",
   "key_size": 4096,
+  "algorithm": "RSA",
   "users": [
     {
       "sub": "user",
