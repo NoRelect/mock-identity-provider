@@ -10,7 +10,7 @@ axum-tracing-opentelemetry = { version = "0.38", features = [
 ] }
 base64 = { version = "0.23.0" }
 chrono = { version = "0.4.45" }
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 openidconnect = { version = "4.0.1", features = [
     "rustls-tls",
 ], default-features = false }
@@ -22,7 +22,7 @@ opentelemetry-otlp = { version = "0.32", default-features = false, features = [
     "reqwest-blocking-client",
     "reqwest-rustls-webpki-roots",
 ] }
-pkcs8 = { version = "0.10", features = ["pem"] }
+pkcs8 = { version = "0.11", features = ["pem"] }
 rsa = { version = "0.9.10" }
 serde = { version = "1.0.228" }
 serde_json = { version = "1.0.150" }
