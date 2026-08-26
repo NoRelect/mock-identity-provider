@@ -8,6 +8,7 @@ mod infra;
 mod keys;
 mod openid;
 mod tokens;
+mod userinfo;
 
 fn main() {
     let tracer_provider = infra::init_tracer_provider();
@@ -52,6 +53,10 @@ fn main() {
         .route("/.well-known/jwks.json", get(openid::get_jwks_route))
         .route("/js/config.js", get(tokens::handle_configjs_route))
         .route("/token", post(tokens::handle_token_route))
+        .route(
+            "/userinfo",
+            get(userinfo::handle_userinfo_route).post(userinfo::handle_userinfo_route),
+        )
         .with_state(state)
         .layer(axum_tracing_opentelemetry::middleware::OtelInResponseLayer::default())
         .layer(axum_tracing_opentelemetry::middleware::OtelAxumLayer::default())

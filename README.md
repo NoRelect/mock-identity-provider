@@ -77,3 +77,20 @@ curl -X POST $ISSUER/token -d "grant_type=password&client_id=demo&username=user"
 ```
 
 The endpoint intentionally doesn't require a password and directly issues the tokens if the user exists within the configuration.
+
+## User Info
+
+The provider exposes a [User Info endpoint](https://openid.net/specs/openid-connect-core-1_0.html#UserInfo) at `$ISSUER/userinfo`. It accepts a GET or POST request carrying one of the previously issued access tokens as a Bearer token and responds with the identifying claims of the token's user from the configuration:
+
+```sh
+ACCESS_TOKEN=$(curl -s -X POST $ISSUER/token -d "grant_type=password&client_id=demo&username=user" | jq -r .access_token)
+curl -s -H "Authorization: Bearer $ACCESS_TOKEN" $ISSUER/userinfo
+```
+
+```json
+{
+  "sub": "user",
+  "name": "User",
+  "email": "normal.user@example.com"
+}
+```
