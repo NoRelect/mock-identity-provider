@@ -4,7 +4,7 @@ function error(message) {
     window.location.assign("/error.html?" + errorParams.toString());
 }
 
-function initialize() {
+async function initialize() {
     let fragment = window.location.hash;
     if (fragment == "") {
         return error("No token information supplied in URL fragment");
@@ -28,11 +28,15 @@ function initialize() {
     document.getElementById("accessToken").innerText = accessToken;
     document.getElementById("idToken").innerText = idToken;
 
-    let decodedAccessToken = JSON.stringify(JSON.parse(atob(accessToken.split('.')[1])), null, 4);
-    document.getElementById("decodedAccessToken").innerText = decodedAccessToken;
-
-    let decodedIdToken = JSON.stringify(JSON.parse(atob(idToken.split('.')[1])), null, 4);
-    document.getElementById("decodedIdToken").innerText = decodedIdToken;
+    let userInfoResponse = await fetch("userinfo", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": "Bearer " + accessToken,
+        }
+    })
+    let userInfo = await userInfoResponse.json();
+    document.getElementById("user-info").innerText = JSON.stringify(userInfo, null, 4);;
 
     // Replace all placeholders with the actual issuer URL
     let issuers = document.getElementsByClassName("replace-issuer");

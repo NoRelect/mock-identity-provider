@@ -1,13 +1,13 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 
 use openidconnect::core::{
-    CoreClaimName, CoreGrantType, CoreJwsSigningAlgorithm, CoreJsonWebKeySet,
-    CoreProviderMetadata, CoreResponseType, CoreSubjectIdentifierType,
+    CoreClaimName, CoreGrantType, CoreJsonWebKeySet, CoreJwsSigningAlgorithm, CoreProviderMetadata,
+    CoreResponseType, CoreSubjectIdentifierType,
 };
 use openidconnect::{
-    AuthUrl, EmptyAdditionalProviderMetadata, IssuerUrl, JsonWebKeySetUrl,
-    ResponseTypes, Scope, TokenUrl,
+    AuthUrl, EmptyAdditionalProviderMetadata, IssuerUrl, JsonWebKeySetUrl, ResponseTypes, Scope,
+    TokenUrl, UserInfoUrl,
 };
 
 pub fn get_core_provider_metadata(state: &crate::config::AppState) -> CoreProviderMetadata {
@@ -33,6 +33,9 @@ pub fn get_core_provider_metadata(state: &crate::config::AppState) -> CoreProvid
         EmptyAdditionalProviderMetadata {},
     )
     .set_token_endpoint(Some(TokenUrl::new(format!("{}token", issuer)).unwrap()))
+    .set_userinfo_endpoint(Some(
+        UserInfoUrl::new(format!("{}userinfo", issuer)).unwrap(),
+    ))
     .set_scopes_supported(Some(vec![Scope::new("openid".to_string())]))
     .set_grant_types_supported(Some(vec![
         CoreGrantType::Password,
