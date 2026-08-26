@@ -6,13 +6,14 @@ use axum::{Form, Json};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use chrono::Utc;
 use openidconnect::core::{
-    CoreErrorResponseType, CoreGenderClaim, CoreJweContentEncryptionAlgorithm,
-    CoreJwsSigningAlgorithm, CoreTokenType, CoreGrantType};
+    CoreErrorResponseType, CoreGenderClaim, CoreGrantType, CoreJweContentEncryptionAlgorithm,
+    CoreJwsSigningAlgorithm, CoreTokenType,
+};
 use openidconnect::{
-    AccessToken, Audience, AuthorizationCodeHash,
-    EmptyExtraTokenFields, IdToken, IdTokenClaims, IdTokenFields,
-    Nonce, RefreshToken, StandardClaims, StandardErrorResponse,
-    StandardTokenResponse, SubjectIdentifier};
+    AccessToken, Audience, AuthorizationCodeHash, EmptyExtraTokenFields, IdToken, IdTokenClaims,
+    IdTokenFields, Nonce, RefreshToken, StandardClaims, StandardErrorResponse,
+    StandardTokenResponse, SubjectIdentifier,
+};
 use serde::Deserialize;
 use tracing::{error, info};
 
@@ -26,8 +27,6 @@ pub struct TokenRequest {
     scope: Option<String>,
     nonce: Option<String>,
 }
-
-// ── Token request handling ────────────────────────────────────────────────
 
 pub async fn handle_token_route(
     State(state): State<crate::config::AppState>,
@@ -46,10 +45,7 @@ pub async fn handle_token_route(
     }
 }
 
-async fn handle_password_grant(
-    state: &crate::config::AppState,
-    request: TokenRequest,
-) -> Response {
+async fn handle_password_grant(state: &crate::config::AppState, request: TokenRequest) -> Response {
     let client_id = match request.client_id {
         Some(id) => id,
         None => return Json(error_response("client_id is missing")).into_response(),
@@ -94,7 +90,10 @@ async fn handle_refresh_token_grant(
 
     let refresh_token_decoded = match URL_SAFE.decode(&refresh_token_str) {
         Ok(data) => data,
-        Err(_) => return Json(error_response("refresh_token is not valid base64 url data")).into_response(),
+        Err(_) => {
+            return Json(error_response("refresh_token is not valid base64 url data"))
+                .into_response();
+        }
     };
 
     let token: crate::config::MidToken = match serde_json::from_slice(&refresh_token_decoded) {
@@ -105,7 +104,10 @@ async fn handle_refresh_token_grant(
     // Only check audience match if client_id was provided
     if let Some(cid) = request.client_id {
         if token.aud != cid {
-            return Json(error_response("refresh_token is not valid for this client_id")).into_response();
+            return Json(error_response(
+                "refresh_token is not valid for this client_id",
+            ))
+            .into_response();
         }
     }
 
@@ -173,13 +175,10 @@ fn error_response(message: &str) -> StandardErrorResponse<CoreErrorResponseType>
     )
 }
 
-// ── Config JS ─────────────────────────────────────────────────────────────
-
-pub async fn handle_configjs_route(
-    State(state): State<crate::config::AppState>,
-) -> Response {
+pub async fn handle_configjs_route(State(state): State<crate::config::AppState>) -> Response {
     let app_config = serde_json::to_string(&state.config).unwrap();
-    let openid_config = serde_json::to_string(&crate::openid::get_core_provider_metadata(&state)).unwrap();
+    let openid_config =
+        serde_json::to_string(&crate::openid::get_core_provider_metadata(&state)).unwrap();
     let js_body = format!(
         "const APP_CONFIG = {};\nconst OPENID_CONFIG = {};",
         app_config, openid_config
@@ -193,8 +192,6 @@ pub async fn handle_configjs_route(
     )
         .into_response()
 }
-
-// ── Token creation ────────────────────────────────────────────────────────
 
 fn create_token_response(
     state: &crate::config::AppState,
@@ -246,14 +243,12 @@ fn create_token_response(
             }
 
             let auth_code_hash = match &code {
-                Some(code) => {
-                    AuthorizationCodeHash::from_code(
-                        &openidconnect::AuthorizationCode::new(code.as_str().to_string()),
-                        &alg,
-                        public_key,
-                    )
-                    .ok()
-                }
+                Some(code) => AuthorizationCodeHash::from_code(
+                    &openidconnect::AuthorizationCode::new(code.as_str().to_string()),
+                    &alg,
+                    public_key,
+                )
+                .ok(),
                 None => None,
             };
 
@@ -300,14 +295,12 @@ fn create_token_response(
             }
 
             let auth_code_hash = match &code {
-                Some(code) => {
-                    AuthorizationCodeHash::from_code(
-                        &openidconnect::AuthorizationCode::new(code.as_str().to_string()),
-                        &alg,
-                        public_key,
-                    )
-                    .ok()
-                }
+                Some(code) => AuthorizationCodeHash::from_code(
+                    &openidconnect::AuthorizationCode::new(code.as_str().to_string()),
+                    &alg,
+                    public_key,
+                )
+                .ok(),
                 None => None,
             };
 
