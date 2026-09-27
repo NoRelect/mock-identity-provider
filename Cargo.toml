@@ -14,8 +14,8 @@ ed25519-dalek = { version = "3.0" }
 openidconnect = { version = "4.0.1", features = [
     "rustls-tls",
 ], default-features = false }
-opentelemetry = { version = "0.32" }
-opentelemetry_sdk = { version = "0.32" }
+opentelemetry = { version = "0.33" }
+opentelemetry_sdk = { version = "0.33" }
 opentelemetry-otlp = { version = "0.32", default-features = false, features = [
     "http-proto",
     "trace",
@@ -29,6 +29,6 @@ serde_json = { version = "1.0.150" }
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "signal"] }
 tower-http = { version = "0.7.0", features = ["full"] }
 tracing = { version = "0.1.44" }
-tracing-opentelemetry = { version = "0.33" }
+tracing-opentelemetry = { version = "0.34" }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 landlock = { version = "0.4.5" }
